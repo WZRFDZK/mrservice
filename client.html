@@ -97,6 +97,33 @@ header{
 }
 .empty{text-align:center;padding:60px 20px;color:var(--muted);}
 
+.geo-btn{
+  width:100%;display:flex;align-items:center;gap:12px;background:#fff;border:1.5px solid var(--line);
+  border-radius:12px;padding:12px 14px;margin-bottom:16px;cursor:pointer;text-align:left;
+  font-family:'Inter',sans-serif;transition:.15s;
+}
+.geo-btn:hover{border-color:var(--orange);}
+.geo-btn.active{border-color:var(--green);background:#f0fdf6;}
+.geo-icon{font-size:18px;}
+.geo-text{flex:1;display:flex;flex-direction:column;}
+.geo-text strong{font-size:13.5px;}
+.geo-text span{font-size:11.5px;color:var(--muted);}
+.geo-action{
+  background:var(--orange);color:#fff;font-size:12px;font-weight:700;padding:6px 12px;
+  border-radius:7px;white-space:nowrap;
+}
+.geo-btn.active .geo-action{background:var(--green);}
+.geo-btn.loading .geo-action{opacity:.6;}
+
+.distance-badge{
+  display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:700;color:var(--green);
+  background:#eafdf3;padding:2px 8px;border-radius:50px;margin-left:6px;
+}
+.distance-badge-detail{
+  display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:700;color:var(--green);
+  margin-top:4px;
+}
+
 .leaflet-popup-content{font-family:'Inter',sans-serif;}
 .popup-title{font-weight:700;font-size:14px;margin-bottom:2px;}
 .popup-meta{font-size:12px;color:var(--muted);margin-bottom:6px;}
@@ -160,7 +187,7 @@ header{
 <header>
   <div class="logo"><div class="mark">🍴</div>Mr.<span>Service</span></div>
   <div class="search-wrap">
-    <input type="text" id="search-input" placeholder="Rechercher un restaurant, une cuisine, une adresse...">
+    <input type="text" id="search-input" autocomplete="off" name="recherche-restaurant" placeholder="Rechercher un restaurant, une cuisine, une adresse...">
   </div>
   <div class="header-actions" id="header-actions">
     <button class="btn btn-ghost" onclick="openModal('login-modal')">Se connecter</button>
@@ -171,6 +198,14 @@ header{
 <div class="layout">
   <div class="list-pane">
     <h2>Restaurants disponibles</h2>
+    <button class="geo-btn" id="geo-btn" onclick="useMyLocation()">
+      <span class="geo-icon">📍</span>
+      <span class="geo-text">
+        <strong>Ma position</strong>
+        <span>Voir les restaurants les plus proches</span>
+      </span>
+      <span class="geo-action">Utiliser</span>
+    </button>
     <p class="sub" id="results-count">Chargement...</p>
     <div id="restaurant-list"></div>
   </div>
@@ -226,6 +261,7 @@ let map, markers = [];
 let activeRestaurant = null;
 let cart = {}; // { produit_id: qty }
 let menuItems = [];
+let userPosition = null; // {lat, lon} — reste UNIQUEMENT dans le navigateur, jamais envoye a Supabase
 
 // ---------- INIT ----------
 async function init(){
@@ -235,7 +271,8 @@ async function init(){
 }
 
 function initMap(){
-  map = L.map('map', { zoomControl: true }).setView([48.8566, 2.3522], 12);
+  map = L.map('map', { zoomControl: false }).setView([48.8566, 2.3522], 12);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19
@@ -327,8 +364,81 @@ async function loadRestaurants(){
   }
 
   allRestaurants = data || [];
-  renderList(allRestaurants);
-  renderMarkers(allRestaurants);
+  applyDistancesAndRender(allRestaurants);
+}
+
+// ---------- GEOLOCALISATION (100% cote navigateur, jamais envoyee a Supabase) ----------
+function useMyLocation(){
+  const btn = document.getElementById('geo-btn');
+
+  if(!navigator.geolocation){
+    alert("La géolocalisation n'est pas disponible sur ce navigateur.");
+    return;
+  }
+
+  btn.classList.add('loading');
+  btn.querySelector('.geo-action').textContent = 'Recherche...';
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      // Ces coordonnees restent en memoire locale (variable JS) uniquement.
+      // Elles ne sont jamais inserees/mises a jour dans Supabase : aucune table
+      // ne les stocke, donc ni le restaurant ni l'admin ne peuvent y acceder.
+      userPosition = { lat: position.coords.latitude, lon: position.coords.longitude };
+
+      btn.classList.remove('loading');
+      btn.classList.add('active');
+      btn.querySelector('.geo-action').textContent = 'Activé';
+      btn.querySelector('.geo-text span').textContent = 'Restaurants triés par proximité';
+
+      applyDistancesAndRender(allRestaurants);
+
+      // Centre la carte sur la position du client (visuel uniquement, toujours local)
+      map.setView([userPosition.lat, userPosition.lon], 13);
+    },
+    (err) => {
+      btn.classList.remove('loading');
+      btn.querySelector('.geo-action').textContent = 'Utiliser';
+      if(err.code === err.PERMISSION_DENIED){
+        alert("Localisation refusée. Autorisez l'accès à votre position dans les réglages du navigateur pour voir les restaurants les plus proches.");
+      } else {
+        alert("Impossible de récupérer votre position pour le moment.");
+      }
+    },
+    { enableHighAccuracy: true, timeout: 8000 }
+  );
+}
+
+// Distance a vol d'oiseau (formule de Haversine), en kilometres
+function distanceKm(lat1, lon1, lat2, lon2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function formatDistance(km){
+  if(km < 1) return `${Math.round(km*1000)} m`;
+  return `${km.toFixed(1)} km`;
+}
+
+function applyDistancesAndRender(list){
+  let withDistance = list;
+  if(userPosition){
+    withDistance = list.map(r => ({
+      ...r,
+      _distance: (r.latitude != null && r.longitude != null)
+        ? distanceKm(userPosition.lat, userPosition.lon, r.latitude, r.longitude)
+        : null
+    })).sort((a, b) => {
+      if(a._distance == null) return 1;
+      if(b._distance == null) return -1;
+      return a._distance - b._distance;
+    });
+  }
+  renderList(withDistance);
+  renderMarkers(withDistance);
 }
 
 function renderList(list){
@@ -345,7 +455,7 @@ function renderList(list){
     <div class="r-card ${r.statut==='bloque'?'blocked':''}" onclick="${r.statut==='bloque' ? '' : `openRestaurant('${r.id}')`}">
       <div class="thumb" style="background-image:url('${r.photo_url || ''}')"></div>
       <div class="info">
-        <h3>${escapeHtml(r.nom)}</h3>
+        <h3>${escapeHtml(r.nom)}${r._distance != null ? `<span class="distance-badge">📍 ${formatDistance(r._distance)}</span>` : ''}</h3>
         <div class="meta">${escapeHtml(r.cuisine)} • ${escapeHtml(r.ville)}</div>
         ${r.statut==='bloque' ? `<span class="badge-blocked">⛔ Ce restaurant a été bloqué sur cette plateforme</span>` : ''}
       </div>
@@ -373,9 +483,12 @@ function renderMarkers(list){
     });
 
     const marker = L.marker([r.latitude, r.longitude], { icon }).addTo(map);
+    const distanceLine = r._distance != null
+      ? `<div class="distance-badge-detail">📍 ${formatDistance(r._distance)}</div>` : '';
     const popupHtml = `
       <div class="popup-title">${escapeHtml(r.nom)}</div>
       <div class="popup-meta">${escapeHtml(r.cuisine)} • ${escapeHtml(r.ville)}</div>
+      ${distanceLine}
       ${isBlocked
         ? `<div style="color:#b91c1c;font-size:12px;font-weight:700;">⛔ Restaurant bloqué sur la plateforme</div>`
         : `<button class="popup-btn" onclick="openRestaurant('${r.id}')">Voir le menu</button>`
@@ -385,7 +498,14 @@ function renderMarkers(list){
     markers.push(marker);
   });
 
-  if(list.length > 0){
+  if(userPosition){
+    const youIcon = L.divIcon({
+      className: '',
+      html: `<div style="width:18px;height:18px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 0 4px rgba(59,130,246,.3);"></div>`,
+      iconSize: [18,18], iconAnchor: [9,9]
+    });
+    L.marker([userPosition.lat, userPosition.lon], { icon: youIcon }).addTo(map).bindPopup('Vous êtes ici');
+  } else if(list.length > 0){
     const valid = list.filter(r => r.latitude != null && r.longitude != null);
     if(valid.length > 0){
       const bounds = L.latLngBounds(valid.map(r => [r.latitude, r.longitude]));
@@ -403,9 +523,9 @@ document.getElementById('search-input').addEventListener('input', (e) => {
     r.ville.toLowerCase().includes(q) ||
     r.adresse.toLowerCase().includes(q)
   );
-  renderList(filtered);
-  renderMarkers(filtered);
+  applyDistancesAndRender(filtered);
 });
+
 
 // ---------- OPEN RESTAURANT / MENU ----------
 async function openRestaurant(id){
@@ -451,11 +571,15 @@ function renderOrderModal(){
     `).join('');
   }
 
+  const distanceLine = (userPosition && r.latitude != null && r.longitude != null)
+    ? `<span class="distance-badge" style="margin-left:8px;">📍 ${formatDistance(distanceKm(userPosition.lat, userPosition.lon, r.latitude, r.longitude))}</span>`
+    : '';
+
   content.innerHTML = `
     <div class="rdetail-header">
       <img src="${r.photo_url || ''}" onerror="this.style.display='none'">
       <div>
-        <h2 style="font-size:19px;">${escapeHtml(r.nom)}</h2>
+        <h2 style="font-size:19px;">${escapeHtml(r.nom)}${distanceLine}</h2>
         <p class="sub" style="margin:2px 0 0;">${escapeHtml(r.cuisine)} • ${escapeHtml(r.adresse)}</p>
       </div>
     </div>
