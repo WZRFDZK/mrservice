@@ -110,7 +110,7 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
   padding:30px;max-height:88vh;overflow-y:auto;position:relative;}
 .modal h2{font-size:19px;margin-bottom:18px;}
 .modal-close{position:absolute;top:16px;right:18px;background:none;border:none;font-size:22px;
-  cursor:pointer;color:#64748b;z-index:10;}
+  cursor:pointer;color:#64748b;}
 </style>
 </head>
 <body>
@@ -242,6 +242,25 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
   </div>
 </div>
 
+<!-- =================== CODE CONFIRMATION MODAL =================== -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal" style="max-width:360px;text-align:center;">
+    <button class="modal-close" onclick="closeConfirmModal()">×</button>
+    <div style="font-size:40px;margin-bottom:12px;">🔑</div>
+    <h2 style="font-size:19px;margin-bottom:6px;">Code de retrait</h2>
+    <p style="color:#64748b;font-size:13.5px;margin-bottom:20px;">Demandez au client son code à 6 chiffres pour valider la remise de la commande.</p>
+    <div class="field">
+      <input type="text" id="confirm-code-input" maxlength="6" placeholder="000000"
+        style="text-align:center;font-size:28px;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:6px;padding:14px;"
+        oninput="this.value=this.value.replace(/\D/g,''); checkConfirmCode()">
+    </div>
+    <div style="background:rgba(239,68,68,.1);color:#ef4444;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;display:none;" id="confirm-error">
+      Code incorrect. Vérifiez avec le client.
+    </div>
+    <button class="btn btn-primary" id="confirm-submit-btn" onclick="submitConfirmCode()" disabled style="width:100%;">Valider la remise</button>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://efmkoqkxymxrxuythtjt.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Y0ZpWYE8USvaEApF6WWZQQ_mtbiGW8B';
@@ -349,17 +368,6 @@ async function signupRestaurant(){
   const { data, error } = await _supabase.auth.signUp({ email, password });
   if(error){ errBox.textContent = error.message; errBox.style.display = 'block'; return; }
 
-  if(!data.user){
-    // Cas confirmation email requise
-    errBox.style.display = 'none';
-    const successBox = document.createElement('div');
-    successBox.className = 'auth-success';
-    successBox.style.display = 'block';
-    successBox.textContent = "Inscription envoyée ! Vérifiez votre email pour confirmer votre compte.";
-    errBox.parentNode.insertBefore(successBox, errBox);
-    return;
-  }
-
   if(data.user){
     const coords = await geocodeAddress(adresse + ', ' + ville);
     const { error: insertErr } = await _supabase.from('restaurants').insert([{
@@ -441,8 +449,8 @@ async function loadExistingOrders(){
     .from('commandes').select('*')
     .eq('restaurant_id', currentUser.id)
     .in('statut', ['recue','en_preparation'])
-    .order('time', { ascending: true });
-  (data || []).forEach(order => displayNewTicket(order, false));
+    .order('date_creation');
+  (data || []).forEach(displayNewTicket);
 }
 
 function displayNewTicket(order, playSound = true){
@@ -453,7 +461,6 @@ function displayNewTicket(order, playSound = true){
   let bodyHtml = '';
   for(const [name, count] of Object.entries(counts)) bodyHtml += `<li>[${count}x] ${escapeHtml(name)}</li>`;
 
-  // Numéro de ticket lisible : 3 derniers chiffres du code de retrait ou timestamp
   const ticketNum = order.code_retrait
     ? order.code_retrait.toString().slice(-3)
     : order.id.toString().replace(/\D/g,'').slice(-3) || '???';
@@ -474,15 +481,48 @@ function displayNewTicket(order, playSound = true){
       <ul class="ticket-items">${bodyHtml}</ul>
       <div class="ticket-total">${(order.total || 0).toFixed(2)} €</div>
     </div>
-    <button class="btn-done" onclick="completeOrder('${order.id}')">Prêt !</button>
+    <button class="btn-done" onclick="openConfirmModal('${order.id}', '${order.code_retrait}')">🔑 Prêt — Saisir le code</button>
   `;
   document.getElementById('kitchen-grid').appendChild(card);
   if(playSound) playAlertSound();
 }
 
-async function completeOrder(id){
-  await _supabase.from('commandes').update({ statut: 'terminee' }).eq('id', id);
-  const card = document.getElementById(`t-${id}`);
+let pendingOrderId = null;
+let pendingOrderCode = null;
+
+function openConfirmModal(orderId, codeRetrait){
+  pendingOrderId = orderId;
+  pendingOrderCode = String(codeRetrait);
+  document.getElementById('confirm-code-input').value = '';
+  document.getElementById('confirm-error').style.display = 'none';
+  document.getElementById('confirm-submit-btn').disabled = true;
+  document.getElementById('confirm-modal').classList.add('show');
+  setTimeout(() => document.getElementById('confirm-code-input').focus(), 100);
+}
+
+function closeConfirmModal(){
+  pendingOrderId = null;
+  pendingOrderCode = null;
+  document.getElementById('confirm-modal').classList.remove('show');
+}
+
+function checkConfirmCode(){
+  const val = document.getElementById('confirm-code-input').value;
+  document.getElementById('confirm-error').style.display = 'none';
+  document.getElementById('confirm-submit-btn').disabled = val.length < 6;
+}
+
+async function submitConfirmCode(){
+  const entered = document.getElementById('confirm-code-input').value.trim();
+  if(entered !== pendingOrderCode){
+    document.getElementById('confirm-error').style.display = 'block';
+    document.getElementById('confirm-code-input').value = '';
+    document.getElementById('confirm-submit-btn').disabled = true;
+    return;
+  }
+  // Code correct → marquer terminée
+  await _supabase.from('commandes').update({ statut: 'terminee' }).eq('id', pendingOrderId);
+  const card = document.getElementById(`t-${pendingOrderId}`);
   if(card){
     card.style.transform = 'scale(0.8)';
     card.style.opacity = '0';
@@ -494,6 +534,7 @@ async function completeOrder(id){
       }
     }, 300);
   }
+  closeConfirmModal();
 }
 
 function playAlertSound(){
@@ -578,7 +619,7 @@ async function saveProduct(){
     return;
   }
 
-  const payload = { nom, prix, categorie, description, photo_url, restaurant_id: currentUser.id, disponible: true };
+  const payload = { nom, prix, categorie, description, photo_url, restaurant_id: currentUser.id };
   let error;
   if(id){
     ({ error } = await _supabase.from('produits').update(payload).eq('id', id));
