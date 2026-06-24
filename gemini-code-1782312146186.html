@@ -1,43 +1,77 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RestoClick - Louez votre site de commande en ligne</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #333; }
-        header { background-color: #ff5722; color: white; padding: 60px 20px; text-align: center; }
-        .container { max-width: 1000px; margin: auto; padding: 20px; }
-        .btn { background-color: #2ecc71; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; margin-top: 20px; }
-        .features { display: flex; justify-content: space-between; margin-top: 40px; }
-        .feature-box { width: 30%; padding: 20px; border: 1px solid #ddd; border-radius: 5px; text-align: center; }
-    </style>
-</head>
-<body>
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
-    <header>
-        <h1>Dites adieu aux erreurs de commande par téléphone</h1>
-        <p>Louez un site web personnalisé pour votre restaurant et recevez des commandes claires, nettes et précises.</p>
-        <a href="#contact" class="btn">Essayer gratuitement</a>
-    </header>
+# --- CONFIGURATION DES PARAMÈTRES ---
+VOTRE_EMAIL = "votre.email@gmail.com"
+VOTRE_MOT_DE_PASSE = "votre_mot_de_passe_d_application"  # Utilisez un mot de passe d'application Google
+SERVEUR_SMTP = "smtp.gmail.com"
+PORT_SMTP = 587
 
-    <div class="container">
-        <h2>Pourquoi choisir la commande en ligne ?</h2>
-        <div class="features">
-            <div class="feature-box">
-                <h3>0% d'Incompréhension</h3>
-                <p>Le client choisit exactement ses ingrédients et ses options en ligne. Plus de quiproquo lié au bruit du restaurant.</p>
-            </div>
-            <div class="feature-box">
-                <h3>Gain de Temps</h3>
-                <p>Votre équipe reste concentrée sur la cuisine et le service, pas sur le téléphone.</p>
-            </div>
-            <div class="feature-box">
-                <h3>Prêt à l'emploi</h3>
-                <p>Nous gérons tout : de la création à la maintenance. Vous ne payez qu'un abonnement mensuel abordable.</p>
-            </div>
+# --- LISTE DES INVITÉS (Nom, E-mail) ---
+invites = [
+    {"nom": "Jean Dupont", "email": "jean.dupont@example.com"},
+    {"nom": "Alice Martin", "email": "alice.martin@example.com"},
+    {"nom": "Directeur Sophie", "email": "sophie.logistique@example.com"}
+]
+
+# --- CORPS DE L'E-MAIL (Format HTML Professionnel) ---
+html_template = """
+<html>
+<body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+    <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; padding: 20px; border-radius: 5px;">
+        <h2 style="color: #1a365d; text-align: center; border-bottom: 2px solid #1a365d; padding-bottom: 10px;">
+            INVITATION OFFICIELLE : GALA ANNUEL & KEYNOTE
+        </h2>
+        <p>Bonjour <strong>{nom}</strong>,</p>
+        <p>Nous avons le plaisir de vous convier à l'événement exclusif marquant le bilan de l'année écoulée et les perspectives d'avenir de notre organisation.</p>
+        
+        <div style="background-color: #f7fafc; padding: 15px; border-left: 4px solid #1a365d; margin: 20px 0;">
+            <p style="margin: 5px 0;">📅 <strong>Date :</strong> Samedi 15 Novembre 2026</p>
+            <p style="margin: 5px 0;">⏰ <strong>Heure :</strong> Accueil émargement dès 20h00 | Début de la Keynote à 20h30</p>
+            <p style="margin: 5px 0;">📍 <strong>Lieu :</strong> Siège Central (HQ), Paris</p>
+            <p style="margin: 5px 0;">👔 <strong>Dress Code :</strong> Business Casual / Tenue de soirée</p>
         </div>
-    </div>
 
+        <p style="text-align: center; margin-top: 30px;">
+            <a href="https://votre-lien-rsvp.com" style="background-color: #1a365d; color: white; padding: 12px 25px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                Confirmer ma présence (R.S.V.P)
+            </a>
+        </p>
+        
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin-top: 30px;">
+        <p style="font-size: 11px; color: #718096; text-align: center;">
+            Cet e-mail est automatisé. Pour toute modification de dernière minute, veuillez contacter le comité d'organisation.
+        </p>
+    </div>
 </body>
 </html>
+"""
+
+# --- SCRIPT D'ENVOI AUTOMATIQUE ---
+try:
+    # Connexion sécurisée au serveur
+    serveur = smtplib.SMTP(SERVEUR_SMTP, PORT_SMTP)
+    serveur.starttls()
+    serveur.login(VOTRE_EMAIL, VOTRE_MOT_DE_PASSE)
+    
+    for invite in invites:
+        # Création du message pour chaque invité
+        msg = MIMEMultipart("alternative")
+        msg["From"] = VOTRE_EMAIL
+        msg["To"] = invite["email"]
+        msg["Subject"] = f"[IMPORTANT] Invitation officielle - {invite['nom']}"
+        
+        # Personnalisation du texte avec le nom de l'invité
+        corps_personnalise = html_template.format(nom=invite["nom"])
+        msg.attach(MIMEText(corps_personnalise, "html"))
+        
+        # Envoi de l'e-mail
+        serveur.sendmail(VOTRE_EMAIL, invite["email"], msg.as_string())
+        print(f"✅ Invitation envoyée avec succès à : {invite['nom']} ({invite['email']})")
+
+    serveur.quit()
+    print("\n🚀 Opération terminée. Toutes les invitations ont été envoyées de manière professionnelle.")
+
+except Exception as e:
+    print(f"❌ Une erreur est survenue lors de l'envoi : {e}")
