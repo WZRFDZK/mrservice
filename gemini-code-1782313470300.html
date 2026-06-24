@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moniteur Cuisine Cloud</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Poppins:wght@600;700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #090d16; color: #f8fafc; font-family: 'Poppins', sans-serif; padding: 30px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 20px; margin-bottom: 30px; }
+        .live-status { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid #10b981; padding: 5px 15px; border-radius: 50px; font-size: 13px; font-weight: 700; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .ticket { background: #111827; border: 2px solid #3b82f6; border-radius: 12px; padding: 20px; box-shadow: 0 0 15px rgba(59, 130, 246, 0.2); display: flex; flex-direction: column; justify-content: space-between; }
+        .ticket-id { font-family: 'JetBrains Mono', monospace; font-size: 18px; color: #3b82f6; }
+        .ticket-body { list-style: none; margin: 15px 0; font-family: 'JetBrains Mono', monospace; font-size: 15px; border-top: 1px dashed #1e293b; border-bottom: 1px dashed #1e293b; padding: 10px 0; }
+        .done-btn { background: #1e293b; color: #fff; border: 1px solid #334155; padding: 12px; border-radius: 6px; font-weight: 700; cursor: pointer; text-transform: uppercase; }
+        .done-btn:hover { background: #10b981; color: #090d16; border-color: #10b981; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>Moniteur Cuisine LIVE (Supabase)</h1>
+            <p style="color: #64748b; font-size: 14px;">Écran connecté par Internet au site client</p>
+        </div>
+        <div class="live-status">● CLOUD CONNECTÉ</div>
+    </div>
+
+    <div class="grid" id="kitchen-grid"></div>
+
+    <script>
+        const _supabase = supabase.createClient('VOTRE_URL_SUPABASE', 'VOTRE_CLE_ANON_SUPABASE');
+        const grid = document.getElementById('kitchen-grid');
+
+        // ÉCOUTEUR ULTRA-PUISSANT : Dès qu'une commande entre dans Supabase, elle pop ici
+        _supabase
+            .channel('schema-db-changes')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'commandes' }, payload => {
+                displayNewTicket(payload.new);
+            })
+            .subscribe();
+
+        function displayNewTicket(order) {
+            const items = JSON.parse(order.items);
+            const counts = {};
+            items.forEach(x => counts[x] = (counts[x] || 0) + 1);
+            
+            let bodyHtml = '';
+            for (const [name, count] of Object.entries(counts)) {
+                bodyHtml += `<li>[${count}x] ${name}</li>`;
+            }
+
+            const card = document.createElement('div');
+            card.className = 'ticket';
+            card.id = `t-${order.id}`;
+            card.innerHTML = `
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="ticket-id">#CMD-${order.id}</span>
+                        <span style="font-size:12px; color:#64748b;">${order.time}</span>
+                    </div>
+                    <ul class="ticket-body">${bodyHtml}</ul>
+                </div>
+                <button class="done-btn" onclick="clearTicket('t-${order.id}')">Prêt</button>
+            `;
+
+            grid.insertBefore(card, grid.firstChild);
+            triggerBuzzer();
+        }
+
+        function clearTicket(id) { document.getElementById(id).remove(); }
+        
+        function triggerBuzzer() {
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = context.createOscillator();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(850, context.currentTime);
+            osc.connect(context.destination);
+            osc.start();
+            osc.stop(context.currentTime + 0.3);
+        }
+    </script>
+</body>
+</html>
