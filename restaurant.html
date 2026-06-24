@@ -79,19 +79,6 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
 .btn-done:hover{background:#10b981;color:#090d16;border-color:#10b981;}
 .empty-state{color:#475569;font-size:14px;grid-column:1/-1;text-align:center;padding:60px 0;}
 
-.pickup-zone{margin-top:0;}
-.code-input-row{display:flex;gap:6px;}
-.code-input{
-  flex:1;padding:10px 12px;border:1.5px solid #3b82f6;border-radius:6px;background:#0c1220;
-  color:#f8fafc;font-family:'JetBrains Mono',monospace;font-size:15px;letter-spacing:2px;text-align:center;
-}
-.code-input:focus{outline:none;border-color:#10b981;}
-.btn-confirm-code{background:#10b981;color:#090d16;border:none;border-radius:6px;width:42px;font-size:16px;font-weight:700;cursor:pointer;}
-.btn-confirm-code:hover{background:#0d9c6f;}
-.btn-cancel-code{background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:6px;width:42px;font-size:16px;cursor:pointer;}
-.btn-cancel-code:hover{background:#334155;}
-.code-error{color:#ef4444;font-size:12px;margin-top:6px;min-height:14px;}
-
 /* ---------- PRODUCTS ---------- */
 .products-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
 .products-toolbar h2{font-size:18px;}
@@ -123,7 +110,7 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
   padding:30px;max-height:88vh;overflow-y:auto;position:relative;}
 .modal h2{font-size:19px;margin-bottom:18px;}
 .modal-close{position:absolute;top:16px;right:18px;background:none;border:none;font-size:22px;
-  cursor:pointer;color:#64748b;}
+  cursor:pointer;color:#64748b;z-index:10;}
 </style>
 </head>
 <body>
@@ -362,6 +349,17 @@ async function signupRestaurant(){
   const { data, error } = await _supabase.auth.signUp({ email, password });
   if(error){ errBox.textContent = error.message; errBox.style.display = 'block'; return; }
 
+  if(!data.user){
+    // Cas confirmation email requise
+    errBox.style.display = 'none';
+    const successBox = document.createElement('div');
+    successBox.className = 'auth-success';
+    successBox.style.display = 'block';
+    successBox.textContent = "Inscription envoyée ! Vérifiez votre email pour confirmer votre compte.";
+    errBox.parentNode.insertBefore(successBox, errBox);
+    return;
+  }
+
   if(data.user){
     const coords = await geocodeAddress(adresse + ', ' + ville);
     const { error: insertErr } = await _supabase.from('restaurants').insert([{
@@ -443,11 +441,11 @@ async function loadExistingOrders(){
     .from('commandes').select('*')
     .eq('restaurant_id', currentUser.id)
     .in('statut', ['recue','en_preparation'])
-    .order('date_creation');
-  (data || []).forEach(displayNewTicket);
+    .order('time', { ascending: true });
+  (data || []).forEach(order => displayNewTicket(order, false));
 }
 
-function displayNewTicket(order){
+function displayNewTicket(order, playSound = true){
   if(document.getElementById(`t-${order.id}`)) return;
 
   const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
@@ -455,85 +453,35 @@ function displayNewTicket(order){
   let bodyHtml = '';
   for(const [name, count] of Object.entries(counts)) bodyHtml += `<li>[${count}x] ${escapeHtml(name)}</li>`;
 
+  // Numéro de ticket lisible : 3 derniers chiffres du code de retrait ou timestamp
+  const ticketNum = order.code_retrait
+    ? order.code_retrait.toString().slice(-3)
+    : order.id.toString().replace(/\D/g,'').slice(-3) || '???';
+
   const emptyMsg = document.getElementById('empty-msg');
   if(emptyMsg) emptyMsg.remove();
 
   const card = document.createElement('div');
   card.className = 'ticket';
   card.id = `t-${order.id}`;
-  card.dataset.code = order.code_retrait || '';
   card.innerHTML = `
     <div>
       <div class="ticket-header">
-        <span class="ticket-number">#${order.id.toString().slice(-3)}</span>
+        <span class="ticket-number">#${ticketNum}</span>
         <span class="ticket-time">${order.time || ''}</span>
       </div>
       <div class="ticket-client">${escapeHtml(order.client_nom || 'Client')}</div>
       <ul class="ticket-items">${bodyHtml}</ul>
       <div class="ticket-total">${(order.total || 0).toFixed(2)} €</div>
     </div>
-    <div class="pickup-zone" id="pickup-zone-${order.id}">
-      <button class="btn-done" data-action="ask-code" data-id="${order.id}">Prêt ! Remettre au client</button>
-    </div>
+    <button class="btn-done" onclick="completeOrder('${order.id}')">Prêt !</button>
   `;
   document.getElementById('kitchen-grid').appendChild(card);
-  playAlertSound();
-}
-
-// Delegation d'evenements sur la grille (gere les clics meme apres ajout dynamique de tickets)
-document.getElementById('kitchen-grid').addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-action]');
-  if(!btn) return;
-  const id = btn.dataset.id;
-
-  if(btn.dataset.action === 'ask-code') showCodeInput(id);
-  else if(btn.dataset.action === 'confirm-code') checkAndComplete(id);
-  else if(btn.dataset.action === 'cancel-code') cancelCodeInput(id);
-});
-
-function showCodeInput(id){
-  const zone = document.getElementById(`pickup-zone-${id}`);
-  zone.innerHTML = `
-    <div class="code-input-row">
-      <input type="text" inputmode="numeric" maxlength="6" placeholder="Code à 6 chiffres" id="code-input-${id}" class="code-input">
-      <button class="btn-confirm-code" data-action="confirm-code" data-id="${id}">✓</button>
-      <button class="btn-cancel-code" data-action="cancel-code" data-id="${id}">✕</button>
-    </div>
-    <div class="code-error" id="code-error-${id}"></div>
-  `;
-  const input = document.getElementById(`code-input-${id}`);
-  input.focus();
-  input.addEventListener('keydown', (e) => { if(e.key === 'Enter') checkAndComplete(id); });
-}
-
-function cancelCodeInput(id){
-  const zone = document.getElementById(`pickup-zone-${id}`);
-  zone.innerHTML = `<button class="btn-done" data-action="ask-code" data-id="${id}">Prêt ! Remettre au client</button>`;
-}
-
-async function checkAndComplete(id){
-  const card = document.getElementById(`t-${id}`);
-  const input = document.getElementById(`code-input-${id}`);
-  const errorBox = document.getElementById(`code-error-${id}`);
-  const entered = (input.value || '').trim();
-  const expected = card.dataset.code;
-
-  if(!entered){
-    errorBox.textContent = "Merci de saisir le code.";
-    return;
-  }
-  if(entered !== expected){
-    errorBox.textContent = "Code incorrect. Vérifiez avec le client.";
-    input.value = '';
-    input.focus();
-    return;
-  }
-
-  await completeOrder(id);
+  if(playSound) playAlertSound();
 }
 
 async function completeOrder(id){
-  await _supabase.from('commandes').update({ statut: 'remise' }).eq('id', id);
+  await _supabase.from('commandes').update({ statut: 'terminee' }).eq('id', id);
   const card = document.getElementById(`t-${id}`);
   if(card){
     card.style.transform = 'scale(0.8)';
@@ -630,7 +578,7 @@ async function saveProduct(){
     return;
   }
 
-  const payload = { nom, prix, categorie, description, photo_url, restaurant_id: currentUser.id };
+  const payload = { nom, prix, categorie, description, photo_url, restaurant_id: currentUser.id, disponible: true };
   let error;
   if(id){
     ({ error } = await _supabase.from('produits').update(payload).eq('id', id));
