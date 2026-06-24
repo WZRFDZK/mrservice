@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mr.Service — Trouvez votre restaurant</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root{
+  --cream:#fdf8f1;
+  --ink:#1b1410;
+  --orange:#e8633c;
+  --orange-dark:#c94f2c;
+  --green:#1f8a5f;
+  --line:#ece2d4;
+  --muted:#8a7c6c;
+  --card:#ffffff;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--cream);color:var(--ink);}
+h1,h2,h3{font-family:'Fraunces',serif;}
+
+/* ---------- HEADER ---------- */
+header{
+  background:#fff;border-bottom:1px solid var(--line);
+  padding:16px 28px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:50;gap:20px;flex-wrap:wrap;
+}
+.logo{display:flex;align-items:center;gap:10px;font-size:21px;font-weight:700;color:var(--ink);}
+.logo span{color:var(--orange);font-family:'Fraunces',serif;}
+.logo .mark{
+  width:38px;height:38px;border-radius:11px;background:var(--orange);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;
+}
+.search-wrap{flex:1;max-width:520px;position:relative;}
+.search-wrap input{
+  width:100%;padding:12px 18px 12px 42px;border:1.5px solid var(--line);border-radius:50px;
+  font-size:14px;background:var(--cream);transition:.2s;
+}
+.search-wrap input:focus{outline:none;border-color:var(--orange);background:#fff;}
+.search-wrap::before{
+  content:"⚲";position:absolute;left:18px;top:50%;transform:translateY(-50%) rotate(90deg);
+  color:var(--muted);font-size:15px;
+}
+.header-actions{display:flex;align-items:center;gap:10px;}
+.btn{
+  border:none;border-radius:9px;padding:10px 18px;font-weight:600;font-size:13.5px;
+  cursor:pointer;transition:.15s;font-family:'Inter',sans-serif;
+}
+.btn-primary{background:var(--orange);color:#fff;}
+.btn-primary:hover{background:var(--orange-dark);}
+.btn-ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line);}
+.btn-ghost:hover{border-color:var(--orange);color:var(--orange);}
+.user-chip{
+  display:flex;align-items:center;gap:8px;background:var(--cream);padding:7px 14px 7px 7px;
+  border-radius:50px;font-size:13.5px;font-weight:600;border:1.5px solid var(--line);
+}
+.user-chip .av{width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;}
+
+/* ---------- LAYOUT ---------- */
+.layout{display:grid;grid-template-columns:420px 1fr;min-height:calc(100vh - 73px);}
+@media (max-width:900px){.layout{grid-template-columns:1fr;}#map{height:320px;}}
+
+.list-pane{padding:24px;overflow-y:auto;max-height:calc(100vh - 73px);}
+.list-pane h2{font-size:19px;margin-bottom:4px;}
+.list-pane .sub{color:var(--muted);font-size:13px;margin-bottom:18px;}
+
+.r-card{
+  background:var(--card);border:1.5px solid var(--line);border-radius:14px;overflow:hidden;
+  margin-bottom:14px;cursor:pointer;transition:.15s;display:flex;
+}
+.r-card:hover{border-color:var(--orange);transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.05);}
+.r-card.blocked{opacity:.65;cursor:default;}
+.r-card.blocked:hover{transform:none;box-shadow:none;border-color:var(--line);}
+.r-card .thumb{width:96px;min-width:96px;background:var(--line);background-size:cover;background-position:center;}
+.r-card .info{padding:13px 15px;flex:1;}
+.r-card .info h3{font-size:15px;font-weight:700;font-family:'Inter',sans-serif;}
+.r-card .info .meta{font-size:12px;color:var(--muted);margin-top:3px;}
+.badge-blocked{
+  display:inline-block;margin-top:6px;font-size:10.5px;font-weight:700;color:#b91c1c;
+  background:#fee2e2;padding:3px 8px;border-radius:5px;
+}
+.empty{text-align:center;padding:60px 20px;color:var(--muted);}
+
+#map{height:calc(100vh - 73px);width:100%;}
+.leaflet-popup-content{font-family:'Inter',sans-serif;}
+.popup-title{font-weight:700;font-size:14px;margin-bottom:2px;}
+.popup-meta{font-size:12px;color:var(--muted);margin-bottom:6px;}
+.popup-btn{background:var(--orange);color:#fff;border:none;border-radius:6px;padding:6px 12px;
+  font-size:12px;font-weight:600;cursor:pointer;width:100%;}
+
+/* ---------- MODALS ---------- */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(20,15,10,.5);display:none;align-items:center;
+  justify-content:center;z-index:200;padding:20px;
+}
+.modal-overlay.show{display:flex;}
+.modal{background:#fff;border-radius:18px;max-width:440px;width:100%;padding:32px;
+  max-height:88vh;overflow-y:auto;}
+.modal h2{font-size:22px;margin-bottom:6px;}
+.modal .sub{color:var(--muted);font-size:13.5px;margin-bottom:22px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px;color:#4a4036;}
+.field input{width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;}
+.field input:focus{outline:none;border-color:var(--orange);}
+.modal-error{background:#fee2e2;color:#b91c1c;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;display:none;}
+.modal-success{background:#dcfce7;color:#15803d;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;display:none;}
+.modal-foot{text-align:center;margin-top:16px;font-size:13px;color:var(--muted);}
+.modal-foot a{color:var(--orange);font-weight:600;cursor:pointer;text-decoration:none;}
+.modal-close{position:absolute;top:18px;right:18px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);}
+.modal{position:relative;}
+.full-btn{width:100%;padding:13px;margin-top:6px;}
+
+/* ---------- RESTAURANT DETAIL / ORDER MODAL ---------- */
+.rdetail-header{display:flex;gap:14px;margin-bottom:20px;align-items:center;}
+.rdetail-header img{width:64px;height:64px;border-radius:12px;object-fit:cover;background:var(--line);}
+.menu-item{display:flex;justify-content:space-between;align-items:center;border:1.5px solid var(--line);
+  border-radius:12px;padding:12px 14px;margin-bottom:10px;}
+.menu-item img{width:46px;height:46px;border-radius:8px;object-fit:cover;background:var(--line);margin-right:12px;}
+.menu-item .mi-left{display:flex;align-items:center;flex:1;}
+.menu-item .mi-text strong{font-size:14px;display:block;}
+.menu-item .mi-text span{font-size:12.5px;color:var(--green);font-weight:700;}
+.qty-controls{display:flex;align-items:center;gap:10px;}
+.qty-controls button{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line);
+  background:#fff;font-size:15px;cursor:pointer;font-weight:700;color:var(--orange);}
+.qty-controls span{font-size:14px;font-weight:700;min-width:16px;text-align:center;}
+.cart-footer{position:sticky;bottom:-32px;background:#fff;margin:20px -32px -32px;padding:18px 32px;
+  border-top:1px solid var(--line);}
+.cart-total{display:flex;justify-content:space-between;font-size:15px;font-weight:700;margin-bottom:12px;}
+
+.gate-msg{text-align:center;padding:30px 10px;}
+.gate-msg .icon{font-size:38px;margin-bottom:10px;}
+.gate-msg p{color:var(--muted);font-size:14px;line-height:1.5;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="mark">🍴</div>Mr.<span>Service</span></div>
+  <div class="search-wrap">
+    <input type="text" id="search-input" placeholder="Rechercher un restaurant, une cuisine, une adresse...">
+  </div>
+  <div class="header-actions" id="header-actions">
+    <button class="btn btn-ghost" onclick="openModal('login-modal')">Se connecter</button>
+    <button class="btn btn-primary" onclick="openModal('signup-modal')">S'inscrire</button>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="list-pane">
+    <h2>Restaurants disponibles</h2>
+    <p class="sub" id="results-count">Chargement...</p>
+    <div id="restaurant-list"></div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<!-- ===================== LOGIN MODAL ===================== -->
+<div class="modal-overlay" id="login-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('login-modal')">×</button>
+    <h2>Connexion</h2>
+    <p class="sub">Accédez à votre compte client</p>
+    <div class="modal-error" id="login-error"></div>
+    <div class="field"><label>Adresse email</label><input type="email" id="login-email" placeholder="vous@exemple.com"></div>
+    <div class="field"><label>Mot de passe</label><input type="password" id="login-password" placeholder="••••••••"></div>
+    <button class="btn btn-primary full-btn" onclick="loginClient()">Se connecter</button>
+    <p class="modal-foot">Pas encore de compte ? <a onclick="switchModal('login-modal','signup-modal')">S'inscrire</a></p>
+    <p class="modal-foot">Vous êtes un restaurant ? <a onclick="closeModal('login-modal'); window.location.href='restaurant.html'">Espace restaurant</a></p>
+  </div>
+</div>
+
+<!-- ===================== SIGNUP MODAL ===================== -->
+<div class="modal-overlay" id="signup-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('signup-modal')">×</button>
+    <h2>Créer un compte</h2>
+    <p class="sub">Inscription gratuite — commandez en quelques secondes</p>
+    <div class="modal-error" id="signup-error"></div>
+    <div class="field"><label>Nom complet</label><input type="text" id="signup-nom" placeholder="Jean Martin"></div>
+    <div class="field"><label>Adresse email</label><input type="email" id="signup-email" placeholder="vous@exemple.com"></div>
+    <div class="field"><label>Mot de passe</label><input type="password" id="signup-password" placeholder="6 caractères minimum"></div>
+    <button class="btn btn-primary full-btn" onclick="signupClient()">Créer mon compte</button>
+    <p class="modal-foot">Déjà inscrit ? <a onclick="switchModal('signup-modal','login-modal')">Se connecter</a></p>
+  </div>
+</div>
+
+<!-- ===================== RESTAURANT DETAIL / ORDER MODAL ===================== -->
+<div class="modal-overlay" id="order-modal">
+  <div class="modal" style="max-width:480px;">
+    <button class="modal-close" onclick="closeModal('order-modal')">×</button>
+    <div id="order-modal-content"></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://efmkoqkxymxrxuythtjt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Y0ZpWYE8USvaEApF6WWZQQ_mtbiGW8B';
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let allRestaurants = [];
+let map, markers = [];
+let activeRestaurant = null;
+let cart = {}; // { produit_id: qty }
+let menuItems = [];
+
+// ---------- INIT ----------
+async function init(){
+  initMap();
+  await checkSession();
+  await loadRestaurants();
+}
+
+function initMap(){
+  map = L.map('map', { zoomControl: true }).setView([48.8566, 2.3522], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(map);
+}
+
+async function checkSession(){
+  const { data } = await _supabase.auth.getSession();
+  if(data.session){
+    currentUser = data.session.user;
+    const { data: clientData } = await _supabase.from('clients').select('*').eq('id', currentUser.id).maybeSingle();
+    renderHeaderLoggedIn(clientData ? clientData.nom : currentUser.email);
+  }
+}
+
+function renderHeaderLoggedIn(nom){
+  const initials = nom.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('header-actions').innerHTML = `
+    <div class="user-chip"><div class="av">${initials}</div>${nom}</div>
+    <button class="btn btn-ghost" onclick="logout()">Déconnexion</button>
+  `;
+}
+
+async function logout(){
+  await _supabase.auth.signOut();
+  currentUser = null;
+  window.location.reload();
+}
+
+// ---------- MODALS ----------
+function openModal(id){ document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function switchModal(from, to){ closeModal(from); openModal(to); }
+
+// ---------- AUTH ----------
+async function signupClient(){
+  const nom = document.getElementById('signup-nom').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  const errBox = document.getElementById('signup-error');
+  errBox.style.display='none';
+
+  if(!nom || !email || password.length < 6){
+    errBox.textContent = "Merci de remplir tous les champs (mot de passe : 6 caractères min).";
+    errBox.style.display='block';
+    return;
+  }
+
+  const { data, error } = await _supabase.auth.signUp({ email, password });
+  if(error){ errBox.textContent = error.message; errBox.style.display='block'; return; }
+
+  if(data.user){
+    const { error: insertErr } = await _supabase.from('clients').insert([{ id: data.user.id, nom }]);
+    if(insertErr){ errBox.textContent = insertErr.message; errBox.style.display='block'; return; }
+  }
+
+  closeModal('signup-modal');
+  currentUser = data.user;
+  renderHeaderLoggedIn(nom);
+}
+
+async function loginClient(){
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errBox = document.getElementById('login-error');
+  errBox.style.display='none';
+
+  const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+  if(error){ errBox.textContent = "Email ou mot de passe incorrect."; errBox.style.display='block'; return; }
+
+  currentUser = data.user;
+  const { data: clientData } = await _supabase.from('clients').select('*').eq('id', currentUser.id).maybeSingle();
+  closeModal('login-modal');
+  renderHeaderLoggedIn(clientData ? clientData.nom : currentUser.email);
+}
+
+// ---------- RESTAURANTS LIST + MAP ----------
+async function loadRestaurants(){
+  const { data, error } = await _supabase
+    .from('restaurants')
+    .select('*')
+    .in('statut', ['actif','bloque'])
+    .order('nom');
+
+  if(error){
+    document.getElementById('results-count').textContent = "Erreur de chargement.";
+    console.error(error);
+    return;
+  }
+
+  allRestaurants = data || [];
+  renderList(allRestaurants);
+  renderMarkers(allRestaurants);
+}
+
+function renderList(list){
+  const container = document.getElementById('restaurant-list');
+  document.getElementById('results-count').textContent =
+    list.length === 0 ? "Aucun restaurant trouvé." : `${list.length} restaurant${list.length>1?'s':''} trouvé${list.length>1?'s':''}`;
+
+  if(list.length === 0){
+    container.innerHTML = `<div class="empty">Aucun restaurant ne correspond à votre recherche.</div>`;
+    return;
+  }
+
+  container.innerHTML = list.map(r => `
+    <div class="r-card ${r.statut==='bloque'?'blocked':''}" onclick="${r.statut==='bloque' ? '' : `openRestaurant('${r.id}')`}">
+      <div class="thumb" style="background-image:url('${r.photo_url || ''}')"></div>
+      <div class="info">
+        <h3>${escapeHtml(r.nom)}</h3>
+        <div class="meta">${escapeHtml(r.cuisine)} • ${escapeHtml(r.ville)}</div>
+        ${r.statut==='bloque' ? `<span class="badge-blocked">⛔ Ce restaurant a été bloqué sur cette plateforme</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderMarkers(list){
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+
+  list.forEach(r => {
+    if(r.latitude == null || r.longitude == null) return;
+
+    const isBlocked = r.statut === 'bloque';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="background:${isBlocked?'#94a3b8':'#e8633c'};width:34px;height:34px;border-radius:50% 50% 50% 0;
+              transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;
+              box-shadow:0 2px 6px rgba(0,0,0,.3);">
+              <span style="transform:rotate(45deg);font-size:15px;">${isBlocked?'⛔':'🍴'}</span>
+            </div>`,
+      iconSize: [34,34],
+      iconAnchor: [17,34]
+    });
+
+    const marker = L.marker([r.latitude, r.longitude], { icon }).addTo(map);
+    const popupHtml = `
+      <div class="popup-title">${escapeHtml(r.nom)}</div>
+      <div class="popup-meta">${escapeHtml(r.cuisine)} • ${escapeHtml(r.ville)}</div>
+      ${isBlocked
+        ? `<div style="color:#b91c1c;font-size:12px;font-weight:700;">⛔ Restaurant bloqué sur la plateforme</div>`
+        : `<button class="popup-btn" onclick="openRestaurant('${r.id}')">Voir le menu</button>`
+      }
+    `;
+    marker.bindPopup(popupHtml);
+    markers.push(marker);
+  });
+
+  if(list.length > 0){
+    const valid = list.filter(r => r.latitude != null && r.longitude != null);
+    if(valid.length > 0){
+      const bounds = L.latLngBounds(valid.map(r => [r.latitude, r.longitude]));
+      map.fitBounds(bounds, { padding: [40,40], maxZoom: 14 });
+    }
+  }
+}
+
+// ---------- SEARCH ----------
+document.getElementById('search-input').addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase().trim();
+  const filtered = allRestaurants.filter(r =>
+    r.nom.toLowerCase().includes(q) ||
+    r.cuisine.toLowerCase().includes(q) ||
+    r.ville.toLowerCase().includes(q) ||
+    r.adresse.toLowerCase().includes(q)
+  );
+  renderList(filtered);
+  renderMarkers(filtered);
+});
+
+// ---------- OPEN RESTAURANT / MENU ----------
+async function openRestaurant(id){
+  activeRestaurant = allRestaurants.find(r => r.id === id);
+  if(!activeRestaurant) return;
+  cart = {};
+
+  const { data, error } = await _supabase
+    .from('produits')
+    .select('*')
+    .eq('restaurant_id', id)
+    .eq('disponible', true)
+    .order('categorie');
+
+  menuItems = data || [];
+  renderOrderModal();
+  openModal('order-modal');
+}
+
+function renderOrderModal(){
+  const r = activeRestaurant;
+  const content = document.getElementById('order-modal-content');
+
+  let menuHtml = '';
+  if(menuItems.length === 0){
+    menuHtml = `<div class="empty">Ce restaurant n'a pas encore ajouté de produits.</div>`;
+  } else {
+    menuHtml = menuItems.map(p => `
+      <div class="menu-item">
+        <div class="mi-left">
+          <img src="${p.photo_url || ''}" onerror="this.style.display='none'">
+          <div class="mi-text">
+            <strong>${escapeHtml(p.nom)}</strong>
+            <span>${p.prix.toFixed(2)} €</span>
+          </div>
+        </div>
+        <div class="qty-controls">
+          <button onclick="changeQty(${p.id}, -1)">−</button>
+          <span id="qty-${p.id}">${cart[p.id] || 0}</span>
+          <button onclick="changeQty(${p.id}, 1)">+</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  content.innerHTML = `
+    <div class="rdetail-header">
+      <img src="${r.photo_url || ''}" onerror="this.style.display='none'">
+      <div>
+        <h2 style="font-size:19px;">${escapeHtml(r.nom)}</h2>
+        <p class="sub" style="margin:2px 0 0;">${escapeHtml(r.cuisine)} • ${escapeHtml(r.adresse)}</p>
+      </div>
+    </div>
+    ${menuHtml}
+    <div class="cart-footer">
+      <div class="cart-total"><span>Total</span><span id="cart-total-amount">0.00 €</span></div>
+      <button class="btn btn-primary full-btn" id="send-order-btn" onclick="sendOrder()" disabled>Envoyer la commande</button>
+    </div>
+  `;
+}
+
+function changeQty(productId, delta){
+  const current = cart[productId] || 0;
+  const next = Math.max(0, current + delta);
+  if(next === 0) delete cart[productId];
+  else cart[productId] = next;
+
+  document.getElementById(`qty-${productId}`).textContent = cart[productId] || 0;
+  updateCartTotal();
+}
+
+function updateCartTotal(){
+  let total = 0;
+  let count = 0;
+  for(const [id, qty] of Object.entries(cart)){
+    const product = menuItems.find(p => p.id == id);
+    if(product){ total += product.prix * qty; count += qty; }
+  }
+  document.getElementById('cart-total-amount').textContent = total.toFixed(2) + ' €';
+  document.getElementById('send-order-btn').disabled = count === 0;
+}
+
+async function sendOrder(){
+  if(!currentUser){
+    closeModal('order-modal');
+    openModal('login-modal');
+    document.getElementById('login-error').textContent = "Connectez-vous pour passer commande.";
+    document.getElementById('login-error').style.display = 'block';
+    return;
+  }
+
+  const items = [];
+  let total = 0;
+  for(const [id, qty] of Object.entries(cart)){
+    const product = menuItems.find(p => p.id == id);
+    if(product){
+      for(let i=0;i<qty;i++) items.push(product.nom);
+      total += product.prix * qty;
+    }
+  }
+  if(items.length === 0) return;
+
+  const { data: clientData } = await _supabase.from('clients').select('nom').eq('id', currentUser.id).maybeSingle();
+  const timeString = new Date().toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+
+  const { error } = await _supabase.from('commandes').insert([{
+    restaurant_id: activeRestaurant.id,
+    client_id: currentUser.id,
+    client_nom: clientData ? clientData.nom : 'Client',
+    items: JSON.stringify(items),
+    total: total,
+    time: timeString,
+    statut: 'recue'
+  }]);
+
+  if(error){
+    alert("Erreur lors de l'envoi de la commande : " + error.message);
+    return;
+  }
+
+  document.getElementById('order-modal-content').innerHTML = `
+    <div class="gate-msg">
+      <div class="icon">✅</div>
+      <h2>Commande envoyée !</h2>
+      <p>Votre commande a été transmise à <strong>${escapeHtml(activeRestaurant.nom)}</strong>. Elle est en cours de préparation.</p>
+      <button class="btn btn-primary full-btn" style="margin-top:18px;" onclick="closeModal('order-modal')">Fermer</button>
+    </div>
+  `;
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mr.Service — Administration</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0c0a09;color:#f5f4f2;font-family:'Poppins',sans-serif;}
+
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.auth-box{background:#1a1614;border:1.5px solid #2d2622;border-radius:18px;padding:38px;max-width:400px;width:100%;}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:19px;font-weight:700;}
+.brand .mark{width:36px;height:36px;border-radius:10px;background:#d4a843;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.auth-box h2{font-size:20px;margin:16px 0 4px;}
+.auth-box .sub{color:#9a8f86;font-size:13px;margin-bottom:22px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:#9a8f86;}
+.field input,.field select{width:100%;padding:11px 14px;border:1.5px solid #2d2622;border-radius:9px;
+  font-size:14px;background:#0c0a09;color:#f5f4f2;font-family:'Poppins',sans-serif;}
+.field input:focus,.field select:focus{outline:none;border-color:#d4a843;}
+.btn{border:none;border-radius:9px;padding:12px 18px;font-weight:700;font-size:14px;cursor:pointer;width:100%;}
+.btn-gold{background:#d4a843;color:#1a1614;}
+.btn-gold:hover{background:#c2962f;}
+.auth-error{background:rgba(239,68,68,.12);color:#ef4444;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;display:none;}
+.auth-foot{text-align:center;margin-top:16px;font-size:12.5px;color:#9a8f86;}
+.auth-foot a{color:#d4a843;cursor:pointer;text-decoration:none;font-weight:600;}
+
+/* ---------- APP SHELL ---------- */
+.app-shell{display:none;}
+.app-shell.show{display:block;}
+.topbar{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2d2622;
+  padding:20px 30px;flex-wrap:wrap;gap:14px;}
+.topbar h1{font-size:19px;font-weight:700;}
+.topbar p{color:#9a8f86;font-size:13px;margin-top:2px;}
+.btn-out{background:#262019;color:#f5f4f2;border:1px solid #3a322b;border-radius:8px;padding:9px 16px;
+  font-size:13px;font-weight:600;cursor:pointer;}
+.btn-out:hover{border-color:#d4a843;color:#d4a843;}
+
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;padding:24px 30px 0;}
+.stat-card{background:#1a1614;border:1px solid #2d2622;border-radius:14px;padding:18px 20px;}
+.stat-card .num{font-size:26px;font-weight:800;}
+.stat-card .label{font-size:12.5px;color:#9a8f86;margin-top:4px;}
+.stat-card.gold .num{color:#d4a843;}
+.stat-card.green .num{color:#10b981;}
+.stat-card.red .num{color:#ef4444;}
+
+.filters{display:flex;gap:8px;padding:24px 30px 0;flex-wrap:wrap;}
+.filter-btn{background:#1a1614;border:1px solid #2d2622;color:#9a8f86;padding:8px 16px;border-radius:50px;
+  font-size:13px;font-weight:600;cursor:pointer;}
+.filter-btn.active{background:#d4a843;color:#1a1614;border-color:#d4a843;}
+
+.r-table{padding:18px 30px 40px;}
+.r-row{background:#1a1614;border:1px solid #2d2622;border-radius:12px;padding:16px 20px;margin-bottom:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.r-row .r-info{display:flex;align-items:center;gap:14px;}
+.r-row .r-thumb{width:48px;height:48px;border-radius:10px;background:#2d2622;background-size:cover;background-position:center;}
+.r-row h3{font-size:14.5px;}
+.r-row .meta{font-size:12px;color:#9a8f86;margin-top:2px;}
+.status-pill{font-size:11px;font-weight:700;padding:4px 10px;border-radius:50px;text-transform:uppercase;letter-spacing:.4px;}
+.status-en_attente{background:rgba(234,179,8,.15);color:#eab308;}
+.status-actif{background:rgba(16,185,129,.15);color:#10b981;}
+.status-bloque{background:rgba(239,68,68,.15);color:#ef4444;}
+.status-refuse{background:rgba(148,163,184,.15);color:#94a3b8;}
+.r-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.r-actions button{border:none;border-radius:7px;padding:8px 13px;font-size:12px;font-weight:700;cursor:pointer;}
+.act-validate{background:rgba(16,185,129,.15);color:#10b981;}
+.act-validate:hover{background:#10b981;color:#fff;}
+.act-block{background:rgba(239,68,68,.15);color:#ef4444;}
+.act-block:hover{background:#ef4444;color:#fff;}
+.act-unblock{background:rgba(59,130,246,.15);color:#3b82f6;}
+.act-unblock:hover{background:#3b82f6;color:#fff;}
+.act-refuse{background:rgba(148,163,184,.15);color:#94a3b8;}
+.act-refuse:hover{background:#475569;color:#fff;}
+.act-delete{background:#2d2622;color:#9a8f86;}
+.act-delete:hover{background:#ef4444;color:#fff;}
+.empty-state{color:#5a5048;font-size:14px;text-align:center;padding:60px 0;}
+</style>
+</head>
+<body>
+
+<!-- =================== LOGIN SCREEN =================== -->
+<div class="auth-wrap" id="screen-login">
+  <div class="auth-box">
+    <div class="brand"><div class="mark">⚙</div>Mr.Service Admin</div>
+    <h2>Connexion administrateur</h2>
+    <p class="sub">Accès réservé à l'équipe Mr.Service</p>
+    <div class="auth-error" id="login-error"></div>
+    <div class="field"><label>Adresse email</label><input type="email" id="login-email"></div>
+    <div class="field"><label>Mot de passe</label><input type="password" id="login-password"></div>
+    <button class="btn btn-gold" onclick="loginAdmin()">Se connecter</button>
+    <p class="auth-foot"><a onclick="window.location.href='client.html'">← Retour au site</a></p>
+  </div>
+</div>
+
+<!-- =================== DENIED SCREEN =================== -->
+<div class="auth-wrap" id="screen-denied" style="display:none;">
+  <div class="auth-box" style="text-align:center;">
+    <div style="font-size:40px;margin-bottom:14px;">🔒</div>
+    <h2>Accès refusé</h2>
+    <p class="sub">Ce compte n'a pas les droits d'administration sur Mr.Service.</p>
+    <button class="btn btn-gold" onclick="logout()">Déconnexion</button>
+  </div>
+</div>
+
+<!-- =================== APP SHELL =================== -->
+<div class="app-shell" id="app-shell">
+  <div class="topbar">
+    <div>
+      <h1>Administration — Mr.Service</h1>
+      <p>Gestion des comptes restaurants</p>
+    </div>
+    <button class="btn-out" onclick="logout()">Déconnexion</button>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card gold"><div class="num" id="stat-attente">0</div><div class="label">En attente de validation</div></div>
+    <div class="stat-card green"><div class="num" id="stat-actifs">0</div><div class="label">Comptes actifs</div></div>
+    <div class="stat-card red"><div class="num" id="stat-bloques">0</div><div class="label">Comptes bloqués</div></div>
+    <div class="stat-card"><div class="num" id="stat-total">0</div><div class="label">Total restaurants</div></div>
+  </div>
+
+  <div class="filters" id="filters">
+    <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">Tous</button>
+    <button class="filter-btn" data-filter="en_attente" onclick="setFilter('en_attente')">En attente</button>
+    <button class="filter-btn" data-filter="actif" onclick="setFilter('actif')">Actifs</button>
+    <button class="filter-btn" data-filter="bloque" onclick="setFilter('bloque')">Bloqués</button>
+    <button class="filter-btn" data-filter="refuse" onclick="setFilter('refuse')">Refusés</button>
+  </div>
+
+  <div class="r-table" id="r-table"></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://efmkoqkxymxrxuythtjt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Y0ZpWYE8USvaEApF6WWZQQ_mtbiGW8B';
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let allRestaurants = [];
+let currentFilter = 'all';
+
+function showScreen(name){
+  document.getElementById('screen-login').style.display = name === 'login' ? 'flex' : 'none';
+  document.getElementById('screen-denied').style.display = name === 'denied' ? 'flex' : 'none';
+  document.getElementById('app-shell').classList.toggle('show', name === 'app');
+}
+
+async function init(){
+  const { data } = await _supabase.auth.getSession();
+  if(data.session){
+    currentUser = data.session.user;
+    await checkAdminAndLoad();
+  } else {
+    showScreen('login');
+  }
+}
+
+async function loginAdmin(){
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errBox = document.getElementById('login-error');
+  errBox.style.display = 'none';
+
+  const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+  if(error){ errBox.textContent = "Email ou mot de passe incorrect."; errBox.style.display = 'block'; return; }
+
+  currentUser = data.user;
+  await checkAdminAndLoad();
+}
+
+async function checkAdminAndLoad(){
+  const { data: adminData } = await _supabase.from('admins').select('*').eq('id', currentUser.id).maybeSingle();
+  if(!adminData){
+    showScreen('denied');
+    return;
+  }
+  showScreen('app');
+  loadRestaurants();
+}
+
+async function logout(){
+  await _supabase.auth.signOut();
+  currentUser = null;
+  showScreen('login');
+}
+
+async function loadRestaurants(){
+  const { data, error } = await _supabase.from('restaurants').select('*').order('date_inscription', { ascending: false });
+  if(error){ console.error(error); return; }
+  allRestaurants = data || [];
+  renderStats();
+  renderTable();
+}
+
+function renderStats(){
+  document.getElementById('stat-attente').textContent = allRestaurants.filter(r => r.statut === 'en_attente').length;
+  document.getElementById('stat-actifs').textContent = allRestaurants.filter(r => r.statut === 'actif').length;
+  document.getElementById('stat-bloques').textContent = allRestaurants.filter(r => r.statut === 'bloque').length;
+  document.getElementById('stat-total').textContent = allRestaurants.length;
+}
+
+function setFilter(f){
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === f));
+  renderTable();
+}
+
+const statusLabels = { en_attente: 'En attente', actif: 'Actif', bloque: 'Bloqué', refuse: 'Refusé' };
+
+function renderTable(){
+  const container = document.getElementById('r-table');
+  const list = currentFilter === 'all' ? allRestaurants : allRestaurants.filter(r => r.statut === currentFilter);
+
+  if(list.length === 0){
+    container.innerHTML = `<div class="empty-state">Aucun restaurant dans cette catégorie.</div>`;
+    return;
+  }
+
+  container.innerHTML = list.map(r => `
+    <div class="r-row">
+      <div class="r-info">
+        <div class="r-thumb" style="background-image:url('${r.photo_url || ''}')"></div>
+        <div>
+          <h3>${escapeHtml(r.nom)} <span class="status-pill status-${r.statut}">${statusLabels[r.statut]}</span></h3>
+          <div class="meta">${escapeHtml(r.cuisine)} • ${escapeHtml(r.ville)} • Inscrit le ${formatDate(r.date_inscription)}</div>
+        </div>
+      </div>
+      <div class="r-actions">
+        ${r.statut === 'en_attente' ? `
+          <button class="act-validate" onclick="updateStatus('${r.id}','actif')">✓ Valider</button>
+          <button class="act-refuse" onclick="updateStatus('${r.id}','refuse')">Refuser</button>
+        ` : ''}
+        ${r.statut === 'actif' ? `<button class="act-block" onclick="updateStatus('${r.id}','bloque')">⛔ Bloquer (impayé)</button>` : ''}
+        ${r.statut === 'bloque' ? `<button class="act-unblock" onclick="updateStatus('${r.id}','actif')">✓ Débloquer</button>` : ''}
+        ${r.statut === 'refuse' ? `<button class="act-validate" onclick="updateStatus('${r.id}','actif')">✓ Valider quand même</button>` : ''}
+        <button class="act-delete" onclick="deleteRestaurant('${r.id}', '${escapeHtml(r.nom)}')">🗑 Supprimer</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function updateStatus(id, statut){
+  const { error } = await _supabase.from('restaurants').update({ statut, derniere_maj: new Date().toISOString() }).eq('id', id);
+  if(error){ alert('Erreur : ' + error.message); return; }
+  loadRestaurants();
+}
+
+async function deleteRestaurant(id, nom){
+  if(!confirm(`Supprimer définitivement "${nom}" ? Cette action est irréversible et supprimera aussi ses produits et commandes.`)) return;
+  const { error } = await _supabase.from('restaurants').delete().eq('id', id);
+  if(error){ alert('Erreur : ' + error.message); return; }
+  loadRestaurants();
+}
+
+function formatDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+init();
+</script>
+</body>
+</html>

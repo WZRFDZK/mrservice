@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mr.Service — Espace Restaurant</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Poppins:wght@400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
+
+/* ---------- AUTH SCREENS ---------- */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.auth-box{background:#111827;border:1.5px solid #1e293b;border-radius:18px;padding:38px;max-width:420px;width:100%;}
+.auth-box .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:20px;font-weight:700;}
+.auth-box .brand .mark{width:36px;height:36px;border-radius:10px;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-size:17px;}
+.auth-box h2{font-size:21px;margin:18px 0 4px;}
+.auth-box .sub{color:#64748b;font-size:13.5px;margin-bottom:22px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px;color:#94a3b8;}
+.field input,.field select,.field textarea{
+  width:100%;padding:11px 14px;border:1.5px solid #1e293b;border-radius:9px;font-size:14px;
+  background:#0c1220;color:#f8fafc;font-family:'Poppins',sans-serif;
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#3b82f6;}
+.btn{border:none;border-radius:9px;padding:12px 18px;font-weight:700;font-size:14px;cursor:pointer;transition:.15s;width:100%;font-family:'Poppins',sans-serif;}
+.btn-primary{background:#3b82f6;color:#fff;}
+.btn-primary:hover{background:#2563eb;}
+.btn-secondary{background:#1e293b;color:#fff;border:1px solid #334155;}
+.btn-secondary:hover{background:#334155;}
+.btn-danger{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid #ef4444;}
+.btn-danger:hover{background:#ef4444;color:#fff;}
+.auth-foot{text-align:center;margin-top:16px;font-size:13px;color:#64748b;}
+.auth-foot a{color:#3b82f6;font-weight:600;cursor:pointer;text-decoration:none;}
+.auth-error{background:rgba(239,68,68,.12);color:#ef4444;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;display:none;}
+.auth-success{background:rgba(16,185,129,.12);color:#10b981;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;display:none;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+.gate-screen{text-align:center;padding:10px 0;}
+.gate-screen .icon{font-size:46px;margin-bottom:14px;}
+.gate-screen h2{font-size:20px;margin-bottom:8px;}
+.gate-screen p{color:#94a3b8;font-size:14px;line-height:1.6;}
+.gate-pending .icon{color:#eab308;}
+.gate-blocked .icon{color:#ef4444;}
+
+/* ---------- APP SHELL ---------- */
+.app-shell{display:none;}
+.app-shell.show{display:block;}
+.topbar{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e293b;
+  padding:18px 28px;flex-wrap:wrap;gap:14px;}
+.topbar .titles h1{font-size:19px;font-family:'Poppins',sans-serif;font-weight:700;}
+.topbar .titles p{color:#64748b;font-size:13px;}
+.live-status{background:rgba(16,185,129,.1);color:#10b981;border:1px solid #10b981;padding:5px 14px;
+  border-radius:50px;font-size:12.5px;font-weight:700;}
+.live-status.error{background:rgba(239,68,68,.1);color:#ef4444;border-color:#ef4444;}
+.live-status.connecting{background:rgba(234,179,8,.1);color:#eab308;border-color:#eab308;}
+.tabs{display:flex;gap:8px;padding:0 28px;border-bottom:1px solid #1e293b;}
+.tab-btn{background:none;border:none;color:#64748b;padding:14px 6px;font-size:14px;font-weight:600;
+  cursor:pointer;border-bottom:2px solid transparent;font-family:'Poppins',sans-serif;}
+.tab-btn.active{color:#3b82f6;border-bottom-color:#3b82f6;}
+.tab-content{padding:28px;display:none;}
+.tab-content.active{display:block;}
+
+/* ---------- KITCHEN GRID ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;}
+.ticket{background:#111827;border:2px solid #3b82f6;border-radius:12px;padding:20px;
+  box-shadow:0 0 15px rgba(59,130,246,.2);display:flex;flex-direction:column;justify-content:space-between;
+  transition:transform .3s,opacity .3s;}
+.ticket-header{display:flex;justify-content:space-between;align-items:baseline;}
+.ticket-number{font-family:'JetBrains Mono',monospace;font-size:17px;color:#3b82f6;}
+.ticket-time{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#64748b;}
+.ticket-client{font-size:12.5px;color:#94a3b8;margin-top:2px;}
+.ticket-items{list-style:none;margin:14px 0;font-family:'JetBrains Mono',monospace;font-size:14.5px;
+  border-top:1px dashed #1e293b;border-bottom:1px dashed #1e293b;padding:10px 0;}
+.ticket-total{font-size:13px;color:#10b981;font-weight:700;margin-bottom:12px;}
+.btn-done{background:#1e293b;color:#fff;border:1px solid #334155;padding:12px;border-radius:6px;
+  font-weight:700;cursor:pointer;text-transform:uppercase;width:100%;font-size:13px;}
+.btn-done:hover{background:#10b981;color:#090d16;border-color:#10b981;}
+.empty-state{color:#475569;font-size:14px;grid-column:1/-1;text-align:center;padding:60px 0;}
+
+/* ---------- PRODUCTS ---------- */
+.products-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+.products-toolbar h2{font-size:18px;}
+.add-product-btn{background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:10px 16px;
+  font-weight:700;font-size:13.5px;cursor:pointer;}
+.products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;}
+.product-card{background:#111827;border:1.5px solid #1e293b;border-radius:12px;overflow:hidden;}
+.product-card .thumb{height:130px;background:#1e293b;background-size:cover;background-position:center;
+  display:flex;align-items:center;justify-content:center;color:#475569;font-size:30px;}
+.product-card .pinfo{padding:14px;}
+.product-card .pinfo h4{font-size:14.5px;margin-bottom:3px;}
+.product-card .pinfo .price{color:#10b981;font-weight:700;font-size:14px;margin-bottom:8px;}
+.product-card .pinfo .cat{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
+.pcard-actions{display:flex;gap:8px;}
+.pcard-actions button{flex:1;padding:8px;border-radius:6px;font-size:12px;font-weight:700;border:none;cursor:pointer;}
+.pc-edit{background:#1e293b;color:#fff;}
+.pc-edit:hover{background:#334155;}
+.pc-delete{background:rgba(239,68,68,.12);color:#ef4444;}
+.pc-delete:hover{background:#ef4444;color:#fff;}
+
+/* ---------- PROFILE ---------- */
+.profile-form{max-width:560px;}
+
+/* ---------- MODALS ---------- */
+.modal-overlay{position:fixed;inset:0;background:rgba(5,8,14,.65);display:none;align-items:center;
+  justify-content:center;z-index:200;padding:20px;}
+.modal-overlay.show{display:flex;}
+.modal{background:#111827;border:1.5px solid #1e293b;border-radius:16px;max-width:440px;width:100%;
+  padding:30px;max-height:88vh;overflow-y:auto;position:relative;}
+.modal h2{font-size:19px;margin-bottom:18px;}
+.modal-close{position:absolute;top:16px;right:18px;background:none;border:none;font-size:22px;
+  cursor:pointer;color:#64748b;}
+</style>
+</head>
+<body>
+
+<!-- =================== LOGIN SCREEN =================== -->
+<div class="auth-wrap" id="screen-login">
+  <div class="auth-box">
+    <div class="brand"><div class="mark">🍴</div>Mr.Service</div>
+    <h2>Espace Restaurant</h2>
+    <p class="sub">Connectez-vous pour gérer votre cuisine</p>
+    <div class="auth-error" id="login-error"></div>
+    <div class="field"><label>Adresse email</label><input type="email" id="login-email"></div>
+    <div class="field"><label>Mot de passe</label><input type="password" id="login-password"></div>
+    <button class="btn btn-primary" onclick="loginRestaurant()">Se connecter</button>
+    <p class="auth-foot">Nouveau restaurant ? <a onclick="showScreen('signup')">Créer un compte</a></p>
+    <p class="auth-foot"><a onclick="window.location.href='client.html'">← Retour à l'espace client</a></p>
+  </div>
+</div>
+
+<!-- =================== SIGNUP SCREEN =================== -->
+<div class="auth-wrap" id="screen-signup" style="display:none;">
+  <div class="auth-box">
+    <div class="brand"><div class="mark">🍴</div>Mr.Service</div>
+    <h2>Inscrire mon restaurant</h2>
+    <p class="sub">Votre fiche sera visible après validation par notre équipe</p>
+    <div class="auth-error" id="signup-error"></div>
+    <div class="field"><label>Nom du restaurant</label><input type="text" id="signup-nom" placeholder="Le Bistro Gourmand"></div>
+    <div class="row2">
+      <div class="field"><label>Type de cuisine</label>
+        <select id="signup-cuisine">
+          <option>Française</option><option>Italienne</option><option>Japonaise</option>
+          <option>Américaine</option><option>Méditerranéenne</option><option>Marocaine</option>
+          <option>Asiatique</option><option>Indienne</option><option>Autre</option>
+        </select>
+      </div>
+      <div class="field"><label>Ville</label><input type="text" id="signup-ville" placeholder="Paris"></div>
+    </div>
+    <div class="field"><label>Adresse complète</label><input type="text" id="signup-adresse" placeholder="12 rue de Rivoli, 75004 Paris"></div>
+    <div class="field"><label>Adresse email</label><input type="email" id="signup-email"></div>
+    <div class="field"><label>Mot de passe</label><input type="password" id="signup-password" placeholder="6 caractères minimum"></div>
+    <button class="btn btn-primary" onclick="signupRestaurant()">Créer mon compte</button>
+    <p class="auth-foot">Déjà inscrit ? <a onclick="showScreen('login')">Se connecter</a></p>
+  </div>
+</div>
+
+<!-- =================== PENDING / BLOCKED GATE =================== -->
+<div class="auth-wrap" id="screen-gate" style="display:none;">
+  <div class="auth-box">
+    <div class="gate-screen" id="gate-content"></div>
+    <button class="btn btn-secondary" style="margin-top:20px;" onclick="logout()">Déconnexion</button>
+  </div>
+</div>
+
+<!-- =================== APP SHELL =================== -->
+<div class="app-shell" id="app-shell">
+  <div class="topbar">
+    <div class="titles">
+      <h1 id="restaurant-name-title">Mon restaurant</h1>
+      <p>Tableau de bord — Mr.Service</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="live-status connecting" id="status-badge">● CONNEXION...</div>
+      <button class="btn btn-secondary" style="width:auto;padding:9px 16px;" onclick="logout()">Déconnexion</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="cuisine" onclick="switchTab('cuisine')">Commandes en direct</button>
+    <button class="tab-btn" data-tab="produits" onclick="switchTab('produits')">Mes produits</button>
+    <button class="tab-btn" data-tab="profil" onclick="switchTab('profil')">Mon profil</button>
+  </div>
+
+  <div class="tab-content active" id="tab-cuisine">
+    <div class="grid" id="kitchen-grid">
+      <div class="empty-state" id="empty-msg">En attente de commandes...</div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-produits">
+    <div class="products-toolbar">
+      <h2>Mes produits</h2>
+      <button class="add-product-btn" onclick="openProductModal()">+ Ajouter un produit</button>
+    </div>
+    <div class="products-grid" id="products-grid"></div>
+  </div>
+
+  <div class="tab-content" id="tab-profil">
+    <div class="profile-form">
+      <div class="field"><label>Nom du restaurant</label><input type="text" id="profile-nom"></div>
+      <div class="row2">
+        <div class="field"><label>Type de cuisine</label>
+          <select id="profile-cuisine">
+            <option>Française</option><option>Italienne</option><option>Japonaise</option>
+            <option>Américaine</option><option>Méditerranéenne</option><option>Marocaine</option>
+            <option>Asiatique</option><option>Indienne</option><option>Autre</option>
+          </select>
+        </div>
+        <div class="field"><label>Ville</label><input type="text" id="profile-ville"></div>
+      </div>
+      <div class="field"><label>Adresse complète</label><input type="text" id="profile-adresse">
+        <p style="font-size:11.5px;color:#64748b;margin-top:5px;">En changeant l'adresse, votre position sur la carte sera automatiquement recalculée.</p>
+      </div>
+      <div class="field"><label>Description</label><textarea id="profile-description" rows="3"></textarea></div>
+      <div class="field"><label>Photo / logo (URL image)</label><input type="text" id="profile-photo" placeholder="https://..."></div>
+      <div class="auth-success" id="profile-success">Profil mis à jour !</div>
+      <div class="auth-error" id="profile-error"></div>
+      <button class="btn btn-primary" style="width:auto;padding:11px 22px;" onclick="saveProfile()">Enregistrer les modifications</button>
+    </div>
+  </div>
+</div>
+
+<!-- =================== PRODUCT MODAL =================== -->
+<div class="modal-overlay" id="product-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeProductModal()">×</button>
+    <h2 id="product-modal-title">Ajouter un produit</h2>
+    <input type="hidden" id="product-id">
+    <div class="field"><label>Nom du produit</label><input type="text" id="product-nom" placeholder="Smash Burger Max"></div>
+    <div class="row2">
+      <div class="field"><label>Prix (€)</label><input type="number" step="0.01" id="product-prix" placeholder="15.90"></div>
+      <div class="field"><label>Catégorie</label>
+        <select id="product-categorie"><option>Entrées</option><option>Plats</option><option>Desserts</option><option>Boissons</option></select>
+      </div>
+    </div>
+    <div class="field"><label>Description (optionnel)</label><input type="text" id="product-description"></div>
+    <div class="field"><label>Photo (URL image)</label><input type="text" id="product-photo" placeholder="https://..."></div>
+    <div class="auth-error" id="product-error"></div>
+    <button class="btn btn-primary" onclick="saveProduct()">Enregistrer le produit</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://efmkoqkxymxrxuythtjt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Y0ZpWYE8USvaEApF6WWZQQ_mtbiGW8B';
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let restaurantProfile = null;
+let channel = null;
+let products = [];
+
+// ---------- SCREEN MANAGEMENT ----------
+function showScreen(name){
+  document.getElementById('screen-login').style.display = name === 'login' ? 'flex' : 'none';
+  document.getElementById('screen-signup').style.display = name === 'signup' ? 'flex' : 'none';
+  document.getElementById('screen-gate').style.display = name === 'gate' ? 'flex' : 'none';
+  document.getElementById('app-shell').classList.toggle('show', name === 'app');
+}
+
+// ---------- INIT / SESSION ----------
+async function init(){
+  const { data } = await _supabase.auth.getSession();
+  if(data.session){
+    currentUser = data.session.user;
+    await loadRestaurantProfile();
+  } else {
+    showScreen('login');
+  }
+}
+
+async function loadRestaurantProfile(){
+  const { data, error } = await _supabase.from('restaurants').select('*').eq('id', currentUser.id).maybeSingle();
+
+  if(error || !data){
+    showScreen('login');
+    return;
+  }
+
+  restaurantProfile = data;
+
+  if(restaurantProfile.statut === 'en_attente'){
+    document.getElementById('gate-content').innerHTML = `
+      <div class="icon">⏳</div>
+      <h2>Compte en attente de validation</h2>
+      <p>Votre inscription a bien été reçue. Notre équipe doit valider votre compte avant qu'il ne soit visible par les clients. Vous recevrez un accès dès l'activation.</p>
+    `;
+    document.getElementById('gate-content').className = 'gate-screen gate-pending';
+    showScreen('gate');
+    return;
+  }
+
+  if(restaurantProfile.statut === 'bloque'){
+    document.getElementById('gate-content').innerHTML = `
+      <div class="icon">⛔</div>
+      <h2>Compte désactivé</h2>
+      <p>Votre compte a été désactivé suite à un non-paiement de votre forfait. Merci de régulariser votre abonnement pour retrouver l'accès à votre espace.</p>
+    `;
+    document.getElementById('gate-content').className = 'gate-screen gate-blocked';
+    showScreen('gate');
+    return;
+  }
+
+  if(restaurantProfile.statut === 'refuse'){
+    document.getElementById('gate-content').innerHTML = `
+      <div class="icon">✕</div>
+      <h2>Inscription refusée</h2>
+      <p>Votre demande d'inscription n'a pas été validée. Contactez notre support pour plus d'informations.</p>
+    `;
+    showScreen('gate');
+    return;
+  }
+
+  // statut === 'actif'
+  document.getElementById('restaurant-name-title').textContent = restaurantProfile.nom;
+  fillProfileForm();
+  showScreen('app');
+  subscribeToOrders();
+  loadProducts();
+}
+
+async function logout(){
+  await _supabase.auth.signOut();
+  currentUser = null;
+  restaurantProfile = null;
+  if(channel) _supabase.removeChannel(channel);
+  showScreen('login');
+}
+
+// ---------- AUTH ----------
+async function signupRestaurant(){
+  const nom = document.getElementById('signup-nom').value.trim();
+  const cuisine = document.getElementById('signup-cuisine').value;
+  const ville = document.getElementById('signup-ville').value.trim();
+  const adresse = document.getElementById('signup-adresse').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  const errBox = document.getElementById('signup-error');
+  errBox.style.display = 'none';
+
+  if(!nom || !ville || !adresse || !email || password.length < 6){
+    errBox.textContent = "Merci de remplir tous les champs (mot de passe : 6 caractères min).";
+    errBox.style.display = 'block';
+    return;
+  }
+
+  const { data, error } = await _supabase.auth.signUp({ email, password });
+  if(error){ errBox.textContent = error.message; errBox.style.display = 'block'; return; }
+
+  if(data.user){
+    const coords = await geocodeAddress(adresse + ', ' + ville);
+    const { error: insertErr } = await _supabase.from('restaurants').insert([{
+      id: data.user.id, nom, cuisine, ville, adresse,
+      latitude: coords ? coords.lat : null,
+      longitude: coords ? coords.lon : null,
+      statut: 'en_attente'
+    }]);
+    if(insertErr){ errBox.textContent = insertErr.message; errBox.style.display = 'block'; return; }
+  }
+
+  currentUser = data.user;
+  await loadRestaurantProfile();
+}
+
+async function loginRestaurant(){
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errBox = document.getElementById('login-error');
+  errBox.style.display = 'none';
+
+  const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+  if(error){ errBox.textContent = "Email ou mot de passe incorrect."; errBox.style.display = 'block'; return; }
+
+  currentUser = data.user;
+  await loadRestaurantProfile();
+}
+
+// ---------- GEOCODING (Nominatim - gratuit) ----------
+async function geocodeAddress(address){
+  try{
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`);
+    const data = await res.json();
+    if(data && data.length > 0){
+      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    }
+  }catch(e){ console.error('Erreur géocodage', e); }
+  return null;
+}
+
+// ---------- TABS ----------
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ---------- KITCHEN / ORDERS (Realtime) ----------
+function setStatus(state){
+  const badge = document.getElementById('status-badge');
+  badge.classList.remove('error','connecting');
+  if(state === 'ok'){ badge.textContent = '● CLOUD CONNECTÉ'; }
+  else if(state === 'error'){ badge.textContent = '● ERREUR DE CONNEXION'; badge.classList.add('error'); }
+  else { badge.textContent = '● CONNEXION...'; badge.classList.add('connecting'); }
+}
+
+function subscribeToOrders(){
+  if(channel) _supabase.removeChannel(channel);
+  setStatus('connecting');
+
+  channel = _supabase
+    .channel('room_cuisine_' + currentUser.id)
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'commandes',
+      filter: `restaurant_id=eq.${currentUser.id}`
+    }, payload => { displayNewTicket(payload.new); })
+    .subscribe((status, err) => {
+      if(status === 'SUBSCRIBED') setStatus('ok');
+      else if(status === 'CHANNEL_ERROR'){ setStatus('error'); setTimeout(subscribeToOrders, 3000); }
+      else if(status === 'TIMED_OUT'){ setStatus('error'); setTimeout(subscribeToOrders, 3000); }
+      else if(status === 'CLOSED'){ setStatus('error'); }
+    });
+
+  loadExistingOrders();
+}
+
+async function loadExistingOrders(){
+  const { data } = await _supabase
+    .from('commandes').select('*')
+    .eq('restaurant_id', currentUser.id)
+    .in('statut', ['recue','en_preparation'])
+    .order('date_creation');
+  (data || []).forEach(displayNewTicket);
+}
+
+function displayNewTicket(order){
+  if(document.getElementById(`t-${order.id}`)) return;
+
+  const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+  const counts = items.reduce((acc, name) => { acc[name] = (acc[name]||0)+1; return acc; }, {});
+  let bodyHtml = '';
+  for(const [name, count] of Object.entries(counts)) bodyHtml += `<li>[${count}x] ${escapeHtml(name)}</li>`;
+
+  const emptyMsg = document.getElementById('empty-msg');
+  if(emptyMsg) emptyMsg.remove();
+
+  const card = document.createElement('div');
+  card.className = 'ticket';
+  card.id = `t-${order.id}`;
+  card.innerHTML = `
+    <div>
+      <div class="ticket-header">
+        <span class="ticket-number">#${order.id.toString().slice(-3)}</span>
+        <span class="ticket-time">${order.time || ''}</span>
+      </div>
+      <div class="ticket-client">${escapeHtml(order.client_nom || 'Client')}</div>
+      <ul class="ticket-items">${bodyHtml}</ul>
+      <div class="ticket-total">${(order.total || 0).toFixed(2)} €</div>
+    </div>
+    <button class="btn-done" onclick="completeOrder(${order.id})">Prêt !</button>
+  `;
+  document.getElementById('kitchen-grid').appendChild(card);
+  playAlertSound();
+}
+
+async function completeOrder(id){
+  await _supabase.from('commandes').update({ statut: 'terminee' }).eq('id', id);
+  const card = document.getElementById(`t-${id}`);
+  if(card){
+    card.style.transform = 'scale(0.8)';
+    card.style.opacity = '0';
+    setTimeout(() => {
+      card.remove();
+      const grid = document.getElementById('kitchen-grid');
+      if(grid.children.length === 0){
+        grid.innerHTML = '<div class="empty-state" id="empty-msg">En attente de commandes...</div>';
+      }
+    }, 300);
+  }
+}
+
+function playAlertSound(){
+  const context = new (window.AudioContext || window.webkitAudioContext)();
+  function r(f,d,o){
+    const osc = context.createOscillator(); const gain = context.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(f, context.currentTime + o);
+    gain.gain.setValueAtTime(0.2, context.currentTime + o);
+    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + o + d);
+    osc.connect(gain); gain.connect(context.destination);
+    osc.start(context.currentTime + o); osc.stop(context.currentTime + o + d);
+  }
+  r(523.25,0.15,0); r(659.25,0.15,0.15); r(783.99,0.3,0.3);
+}
+
+// ---------- PRODUCTS ----------
+async function loadProducts(){
+  const { data, error } = await _supabase.from('produits').select('*').eq('restaurant_id', currentUser.id).order('date_creation', {ascending:false});
+  products = data || [];
+  renderProducts();
+}
+
+function renderProducts(){
+  const grid = document.getElementById('products-grid');
+  if(products.length === 0){
+    grid.innerHTML = `<div class="empty-state">Vous n'avez pas encore ajouté de produits. Cliquez sur "+ Ajouter un produit" pour commencer.</div>`;
+    return;
+  }
+  grid.innerHTML = products.map(p => `
+    <div class="product-card">
+      <div class="thumb" style="${p.photo_url ? `background-image:url('${p.photo_url}')` : ''}">${p.photo_url ? '' : '🍽️'}</div>
+      <div class="pinfo">
+        <div class="cat">${escapeHtml(p.categorie)}</div>
+        <h4>${escapeHtml(p.nom)}</h4>
+        <div class="price">${p.prix.toFixed(2)} €</div>
+        <div class="pcard-actions">
+          <button class="pc-edit" onclick="openProductModal(${p.id})">Modifier</button>
+          <button class="pc-delete" onclick="deleteProduct(${p.id})">Supprimer</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openProductModal(id){
+  document.getElementById('product-error').style.display = 'none';
+  if(id){
+    const p = products.find(x => x.id === id);
+    document.getElementById('product-modal-title').textContent = 'Modifier le produit';
+    document.getElementById('product-id').value = p.id;
+    document.getElementById('product-nom').value = p.nom;
+    document.getElementById('product-prix').value = p.prix;
+    document.getElementById('product-categorie').value = p.categorie;
+    document.getElementById('product-description').value = p.description || '';
+    document.getElementById('product-photo').value = p.photo_url || '';
+  } else {
+    document.getElementById('product-modal-title').textContent = 'Ajouter un produit';
+    document.getElementById('product-id').value = '';
+    document.getElementById('product-nom').value = '';
+    document.getElementById('product-prix').value = '';
+    document.getElementById('product-categorie').value = 'Plats';
+    document.getElementById('product-description').value = '';
+    document.getElementById('product-photo').value = '';
+  }
+  document.getElementById('product-modal').classList.add('show');
+}
+function closeProductModal(){ document.getElementById('product-modal').classList.remove('show'); }
+
+async function saveProduct(){
+  const id = document.getElementById('product-id').value;
+  const nom = document.getElementById('product-nom').value.trim();
+  const prix = parseFloat(document.getElementById('product-prix').value);
+  const categorie = document.getElementById('product-categorie').value;
+  const description = document.getElementById('product-description').value.trim();
+  const photo_url = document.getElementById('product-photo').value.trim();
+  const errBox = document.getElementById('product-error');
+
+  if(!nom || isNaN(prix) || prix <= 0){
+    errBox.textContent = "Merci d'indiquer un nom et un prix valide.";
+    errBox.style.display = 'block';
+    return;
+  }
+
+  const payload = { nom, prix, categorie, description, photo_url, restaurant_id: currentUser.id };
+  let error;
+  if(id){
+    ({ error } = await _supabase.from('produits').update(payload).eq('id', id));
+  } else {
+    ({ error } = await _supabase.from('produits').insert([payload]));
+  }
+
+  if(error){ errBox.textContent = error.message; errBox.style.display = 'block'; return; }
+
+  closeProductModal();
+  loadProducts();
+}
+
+async function deleteProduct(id){
+  if(!confirm('Supprimer ce produit ?')) return;
+  await _supabase.from('produits').delete().eq('id', id);
+  loadProducts();
+}
+
+// ---------- PROFILE ----------
+function fillProfileForm(){
+  document.getElementById('profile-nom').value = restaurantProfile.nom || '';
+  document.getElementById('profile-cuisine').value = restaurantProfile.cuisine || 'Autre';
+  document.getElementById('profile-ville').value = restaurantProfile.ville || '';
+  document.getElementById('profile-adresse').value = restaurantProfile.adresse || '';
+  document.getElementById('profile-description').value = restaurantProfile.description || '';
+  document.getElementById('profile-photo').value = restaurantProfile.photo_url || '';
+}
+
+async function saveProfile(){
+  const nom = document.getElementById('profile-nom').value.trim();
+  const cuisine = document.getElementById('profile-cuisine').value;
+  const ville = document.getElementById('profile-ville').value.trim();
+  const adresse = document.getElementById('profile-adresse').value.trim();
+  const description = document.getElementById('profile-description').value.trim();
+  const photo_url = document.getElementById('profile-photo').value.trim();
+  const successBox = document.getElementById('profile-success');
+  const errBox = document.getElementById('profile-error');
+  successBox.style.display = 'none';
+  errBox.style.display = 'none';
+
+  let coords = { lat: restaurantProfile.latitude, lon: restaurantProfile.longitude };
+  if(adresse !== restaurantProfile.adresse || ville !== restaurantProfile.ville){
+    const geo = await geocodeAddress(adresse + ', ' + ville);
+    if(geo) coords = geo;
+  }
+
+  const { error } = await _supabase.from('restaurants').update({
+    nom, cuisine, ville, adresse, description, photo_url,
+    latitude: coords.lat, longitude: coords.lon,
+    derniere_maj: new Date().toISOString()
+  }).eq('id', currentUser.id);
+
+  if(error){ errBox.textContent = error.message; errBox.style.display = 'block'; return; }
+
+  restaurantProfile = { ...restaurantProfile, nom, cuisine, ville, adresse, description, photo_url };
+  document.getElementById('restaurant-name-title').textContent = nom;
+  successBox.style.display = 'block';
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+init();
+</script>
+</body>
+</html>
