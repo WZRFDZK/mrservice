@@ -79,6 +79,19 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
 .btn-done:hover{background:#10b981;color:#090d16;border-color:#10b981;}
 .empty-state{color:#475569;font-size:14px;grid-column:1/-1;text-align:center;padding:60px 0;}
 
+.pickup-zone{margin-top:0;}
+.code-input-row{display:flex;gap:6px;}
+.code-input{
+  flex:1;padding:10px 12px;border:1.5px solid #3b82f6;border-radius:6px;background:#0c1220;
+  color:#f8fafc;font-family:'JetBrains Mono',monospace;font-size:15px;letter-spacing:2px;text-align:center;
+}
+.code-input:focus{outline:none;border-color:#10b981;}
+.btn-confirm-code{background:#10b981;color:#090d16;border:none;border-radius:6px;width:42px;font-size:16px;font-weight:700;cursor:pointer;}
+.btn-confirm-code:hover{background:#0d9c6f;}
+.btn-cancel-code{background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:6px;width:42px;font-size:16px;cursor:pointer;}
+.btn-cancel-code:hover{background:#334155;}
+.code-error{color:#ef4444;font-size:12px;margin-top:6px;min-height:14px;}
+
 /* ---------- PRODUCTS ---------- */
 .products-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
 .products-toolbar h2{font-size:18px;}
@@ -448,6 +461,7 @@ function displayNewTicket(order){
   const card = document.createElement('div');
   card.className = 'ticket';
   card.id = `t-${order.id}`;
+  card.dataset.code = order.code_retrait || '';
   card.innerHTML = `
     <div>
       <div class="ticket-header">
@@ -458,14 +472,68 @@ function displayNewTicket(order){
       <ul class="ticket-items">${bodyHtml}</ul>
       <div class="ticket-total">${(order.total || 0).toFixed(2)} €</div>
     </div>
-    <button class="btn-done" onclick="completeOrder(${order.id})">Prêt !</button>
+    <div class="pickup-zone" id="pickup-zone-${order.id}">
+      <button class="btn-done" data-action="ask-code" data-id="${order.id}">Prêt ! Remettre au client</button>
+    </div>
   `;
   document.getElementById('kitchen-grid').appendChild(card);
   playAlertSound();
 }
 
+// Delegation d'evenements sur la grille (gere les clics meme apres ajout dynamique de tickets)
+document.getElementById('kitchen-grid').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  const id = btn.dataset.id;
+
+  if(btn.dataset.action === 'ask-code') showCodeInput(id);
+  else if(btn.dataset.action === 'confirm-code') checkAndComplete(id);
+  else if(btn.dataset.action === 'cancel-code') cancelCodeInput(id);
+});
+
+function showCodeInput(id){
+  const zone = document.getElementById(`pickup-zone-${id}`);
+  zone.innerHTML = `
+    <div class="code-input-row">
+      <input type="text" inputmode="numeric" maxlength="6" placeholder="Code à 6 chiffres" id="code-input-${id}" class="code-input">
+      <button class="btn-confirm-code" data-action="confirm-code" data-id="${id}">✓</button>
+      <button class="btn-cancel-code" data-action="cancel-code" data-id="${id}">✕</button>
+    </div>
+    <div class="code-error" id="code-error-${id}"></div>
+  `;
+  const input = document.getElementById(`code-input-${id}`);
+  input.focus();
+  input.addEventListener('keydown', (e) => { if(e.key === 'Enter') checkAndComplete(id); });
+}
+
+function cancelCodeInput(id){
+  const zone = document.getElementById(`pickup-zone-${id}`);
+  zone.innerHTML = `<button class="btn-done" data-action="ask-code" data-id="${id}">Prêt ! Remettre au client</button>`;
+}
+
+async function checkAndComplete(id){
+  const card = document.getElementById(`t-${id}`);
+  const input = document.getElementById(`code-input-${id}`);
+  const errorBox = document.getElementById(`code-error-${id}`);
+  const entered = (input.value || '').trim();
+  const expected = card.dataset.code;
+
+  if(!entered){
+    errorBox.textContent = "Merci de saisir le code.";
+    return;
+  }
+  if(entered !== expected){
+    errorBox.textContent = "Code incorrect. Vérifiez avec le client.";
+    input.value = '';
+    input.focus();
+    return;
+  }
+
+  await completeOrder(id);
+}
+
 async function completeOrder(id){
-  await _supabase.from('commandes').update({ statut: 'terminee' }).eq('id', id);
+  await _supabase.from('commandes').update({ statut: 'remise' }).eq('id', id);
   const card = document.getElementById(`t-${id}`);
   if(card){
     card.style.transform = 'scale(0.8)';
