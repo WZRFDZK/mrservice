@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root{
   --cream:#fdf8f1;
@@ -145,6 +145,14 @@ header{
 .gate-msg{text-align:center;padding:30px 10px;}
 .gate-msg .icon{font-size:38px;margin-bottom:10px;}
 .gate-msg p{color:var(--muted);font-size:14px;line-height:1.5;}
+
+.pickup-code-box{
+  margin-top:20px;background:var(--cream);border:1.5px dashed var(--orange);border-radius:14px;
+  padding:18px;display:flex;flex-direction:column;align-items:center;gap:4px;
+}
+.pickup-code-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.pickup-code-value{font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:700;color:var(--orange-dark);letter-spacing:4px;margin:4px 0;}
+.pickup-code-hint{font-size:12.5px;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -502,6 +510,7 @@ async function sendOrder(){
 
   const { data: clientData } = await _supabase.from('clients').select('nom').eq('id', currentUser.id).maybeSingle();
   const timeString = new Date().toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const codeRetrait = String(Math.floor(100000 + Math.random() * 900000)); // code a 6 chiffres
 
   const { error } = await _supabase.from('commandes').insert([{
     restaurant_id: activeRestaurant.id,
@@ -510,7 +519,8 @@ async function sendOrder(){
     items: JSON.stringify(items),
     total: total,
     time: timeString,
-    statut: 'recue'
+    statut: 'recue',
+    code_retrait: codeRetrait
   }]);
 
   if(error){
@@ -523,6 +533,11 @@ async function sendOrder(){
       <div class="icon">✅</div>
       <h2>Commande envoyée !</h2>
       <p>Votre commande a été transmise à <strong>${escapeHtml(activeRestaurant.nom)}</strong>. Elle est en cours de préparation.</p>
+      <div class="pickup-code-box">
+        <span class="pickup-code-label">Votre code de retrait</span>
+        <span class="pickup-code-value">${codeRetrait}</span>
+        <span class="pickup-code-hint">Donnez ce code au restaurant pour récupérer votre commande</span>
+      </div>
       <button class="btn btn-primary full-btn" style="margin-top:18px;" onclick="closeModal('order-modal')">Fermer</button>
     </div>
   `;
