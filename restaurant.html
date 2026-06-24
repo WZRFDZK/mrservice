@@ -31,57 +31,79 @@
 
     <div class="grid" id="kitchen-grid"></div>
 
-    <script>
-        const _supabase = supabase.createClient('https://efmkoqkxymxrxuythtjt.supabase.co', 'sb_publishable_Y0ZpWYE8USvaEpF6WWZQQ_mtbiGW8B')
-        const grid = document.getElementById('kitchen-grid');
+   <script>
+    const _supabase = supabase.createClient('https://efmkoqkxymxrxuythtjt.supabase.co', 'sb_publishable_Y0ZpWYE8USvaEpF6WWZQQ_mtbiGW8B');
+    const grid = document.getElementById('kitchen-grid');
 
-        // ÉCOUTEUR ULTRA-PUISSANT : Dès qu'une commande entre dans Supabase, elle pop ici
-        _supabase
-            .channel('schema-db-changes')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'commandes' }, payload => {
-                displayNewTicket(payload.new);
-            })
-            .subscribe();
+    // ÉCOUTEUR ULTRA-PUISSANT : Dès qu'une commande entre dans Supabase, elle pop ici
+    const channel = _supabase
+        .channel('public:commandes')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'commandes' }, payload => {
+            displayNewTicket(payload.new);
+        })
+        .subscribe((status) => {
+            console.log("Statut de la connexion Realtime :", status);
+        });
 
-        function displayNewTicket(order) {
-            // Exemple de ce qu'il faut adapter dans ton code :
-const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
-const time = order.time;
-            
-          const counts = items.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});  let bodyHtml = '';
-            for (const [name, count] of Object.entries(counts)) {
-                bodyHtml += `<li>[${count}x] ${name}</li>`;
-            }
+    function displayNewTicket(order) {
+        const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+        const time = order.time;
 
-            const card = document.createElement('div');
-            card.className = 'ticket';
-            card.id = `t-${order.id}`;
-            card.innerHTML = `
-                <div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span class="ticket-id">#CMD-${order.id}</span>
-                        <span style="font-size:12px; color:#64748b;">${order.time}</span>
-                    </div>
-                    <ul class="ticket-body">${bodyHtml}</ul>
+        const counts = items.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});
+        let bodyHtml = '';
+        for (const [name, count] of Object.entries(counts)) {
+            bodyHtml += `<li>[${count}x] ${name}</li>`;
+        }
+
+        const card = document.createElement('div');
+        card.className = 'ticket';
+        card.id = `t-${order.id}`;
+        card.innerHTML = `
+            <div>
+                <div class="ticket-header">
+                    <span class="ticket-number">#${order.id.toString().slice(-3)}</span>
+                    <span class="ticket-time">${time}</span>
                 </div>
-                <button class="done-btn" onclick="clearTicket('t-${order.id}')">Prêt</button>
-            `;
-
-            grid.insertBefore(card, grid.firstChild);
-            triggerBuzzer();
-        }
-
-        function clearTicket(id) { document.getElementById(id).remove(); }
+                <ul class="ticket-items">
+                    ${bodyHtml}
+                </ul>
+            </div>
+            <button class="btn-done" onclick="completeOrder(${order.id})">Prêt !</button>
+        `;
         
-        function triggerBuzzer() {
-            const context = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = context.createOscillator();
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(850, context.currentTime);
-            osc.connect(context.destination);
-            osc.start();
-            osc.stop(context.currentTime + 0.3);
+        grid.appendChild(card);
+        playAlertSound();
+    }
+
+    function completeOrder(id) {
+        const card = document.getElementById(`t-${id}`);
+        if (card) {
+            card.style.transform = 'scale(0.8)';
+            card.style.opacity = '0';
+            setTimeout(() => card.remove(), 300);
         }
-    </script>
+    }
+
+    function playAlertSound() {
+        const context = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function r(f, d, o) {
+            const osc = context.createOscillator();
+            const gain = context.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, context.currentTime + o);
+            gain.gain.setValueAtTime(0.2, context.currentTime + o);
+            gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + o + d);
+            osc.connect(gain);
+            gain.connect(context.destination);
+            osc.start(context.currentTime + o);
+            osc.stop(context.currentTime + o + d);
+        }
+
+        r(523.25, 0.15, 0);
+        r(659.25, 0.15, 0.15);
+        r(783.99, 0.3, 0.3);
+    }
+</script>
 </body>
 </html>
