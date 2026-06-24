@@ -230,17 +230,33 @@ function renderTable(){
       </div>
       <div class="r-actions">
         ${r.statut === 'en_attente' ? `
-          <button class="act-validate" onclick="updateStatus('${r.id}','actif')">✓ Valider</button>
-          <button class="act-refuse" onclick="updateStatus('${r.id}','refuse')">Refuser</button>
+          <button class="act-validate" data-action="validate" data-id="${r.id}">✓ Valider</button>
+          <button class="act-refuse" data-action="refuse" data-id="${r.id}">Refuser</button>
         ` : ''}
-        ${r.statut === 'actif' ? `<button class="act-block" onclick="updateStatus('${r.id}','bloque')">⛔ Bloquer (impayé)</button>` : ''}
-        ${r.statut === 'bloque' ? `<button class="act-unblock" onclick="updateStatus('${r.id}','actif')">✓ Débloquer</button>` : ''}
-        ${r.statut === 'refuse' ? `<button class="act-validate" onclick="updateStatus('${r.id}','actif')">✓ Valider quand même</button>` : ''}
-        <button class="act-delete" onclick="deleteRestaurant('${r.id}', '${escapeHtml(r.nom)}')">🗑 Supprimer</button>
+        ${r.statut === 'actif' ? `<button class="act-block" data-action="block" data-id="${r.id}">⛔ Bloquer (impayé)</button>` : ''}
+        ${r.statut === 'bloque' ? `<button class="act-unblock" data-action="unblock" data-id="${r.id}">✓ Débloquer</button>` : ''}
+        ${r.statut === 'refuse' ? `<button class="act-validate" data-action="validate" data-id="${r.id}">✓ Valider quand même</button>` : ''}
+        <button class="act-delete" data-action="delete" data-id="${r.id}" data-nom="${escapeHtml(r.nom)}">🗑 Supprimer</button>
       </div>
     </div>
   `).join('');
 }
+
+// Delegation d'evenements : un seul listener sur le conteneur, fiable
+// quel que soit le contenu du nom (apostrophes, accents, guillemets...)
+document.getElementById('r-table').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+
+  const action = btn.dataset.action;
+  const id = btn.dataset.id;
+
+  if(action === 'validate') updateStatus(id, 'actif');
+  else if(action === 'refuse') updateStatus(id, 'refuse');
+  else if(action === 'block') updateStatus(id, 'bloque');
+  else if(action === 'unblock') updateStatus(id, 'actif');
+  else if(action === 'delete') deleteRestaurant(id, btn.dataset.nom);
+});
 
 async function updateStatus(id, statut){
   const { error } = await _supabase.from('restaurants').update({ statut, derniere_maj: new Date().toISOString() }).eq('id', id);
@@ -263,7 +279,7 @@ function formatDate(iso){
 function escapeHtml(str){
   const div = document.createElement('div');
   div.textContent = str ?? '';
-  return div.innerHTML;
+  return div.innerHTML.replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 }
 
 init();
