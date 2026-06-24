@@ -31,13 +31,13 @@
 
     <div class="grid" id="kitchen-grid"></div>
 
-   <script>
+  <script>
     const _supabase = supabase.createClient('https://efmkoqkxymxrxuythtjt.supabase.co', 'sb_publishable_Y0ZpWYE8USvaEpF6WWZQQ_mtbiGW8B');
     const grid = document.getElementById('kitchen-grid');
 
-    // ÉCOUTEUR ULTRA-PUISSANT : Dès qu'une commande entre dans Supabase, elle pop ici
+    // ÉCOUTEUR NETTOYÉ
     const channel = _supabase
-        .channel('public:commandes')
+        .channel('room_cuisine')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'commandes' }, payload => {
             displayNewTicket(payload.new);
         })
