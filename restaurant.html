@@ -44,11 +44,11 @@
             .subscribe();
 
         function displayNewTicket(order) {
-            const items = JSON.parse(order.items);
-            const counts = {};
-            items.forEach(x => counts[x] = (counts[x] || 0) + 1);
+            // Exemple de ce qu'il faut adapter dans ton code :
+const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+const time = order.time;
             
-            let bodyHtml = '';
+          const counts = items.reduce((acc, name) => { acc[name] = (acc[name] || 0) + 1; return acc; }, {});  let bodyHtml = '';
             for (const [name, count] of Object.entries(counts)) {
                 bodyHtml += `<li>[${count}x] ${name}</li>`;
             }
