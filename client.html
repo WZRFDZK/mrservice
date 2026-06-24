@@ -63,8 +63,8 @@
             
             // On envoie la commande direct dans la base de données sur internet
             const { error } = await _supabase
-                .from('commandes')
-                .insert([{ items: JSON.stringify(cart), time: timeString }]);
+    .from('commandes') // <--- Vérifie ce nom
+    .insert([{ items: JSON.stringify(cart), time: timeString }]);
 
             if (!error) {
                 alert("Commande reçue par la cuisine !");
