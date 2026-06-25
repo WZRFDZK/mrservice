@@ -113,7 +113,15 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
   padding:30px;max-height:88vh;overflow-y:auto;position:relative;}
 .modal h2{font-size:19px;margin-bottom:18px;}
 .modal-close{position:absolute;top:16px;right:18px;background:none;border:none;font-size:22px;
-  cursor:pointer;color:#64748b;}
+  cursor:pointer;color:#64748b;z-index:10;}
+
+/* ---------- CODE CONFIRM ---------- */
+.code-input-big{
+  text-align:center;font-size:32px;font-family:'JetBrains Mono',monospace;font-weight:700;
+  letter-spacing:8px;padding:16px;width:100%;border:1.5px solid #1e293b;border-radius:12px;
+  background:#0c1220;color:#f8fafc;
+}
+.code-input-big:focus{outline:none;border-color:#3b82f6;}
 </style>
 </head>
 <body>
@@ -254,6 +262,28 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
 
 <!-- =================== PRODUCT MODAL =================== -->
 <div class="modal-overlay" id="product-modal">
+
+<!-- =================== CODE CONFIRM MODAL =================== -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal" style="max-width:360px;text-align:center;">
+    <button class="modal-close" onclick="closeConfirmModal()">×</button>
+    <div style="font-size:42px;margin-bottom:12px;">🔑</div>
+    <h2 style="font-size:19px;margin-bottom:6px;">Code de retrait</h2>
+    <p style="color:#64748b;font-size:13.5px;margin-bottom:20px;line-height:1.6;">
+      Demandez au client son code à 6 chiffres et saisissez-le ci-dessous pour valider la remise.
+    </p>
+    <div class="field">
+      <input class="code-input-big" type="text" id="confirm-code-input" maxlength="6" placeholder="000000"
+        oninput="this.value=this.value.replace(/\D/g,''); checkConfirmCode()">
+    </div>
+    <div class="auth-error" id="confirm-error" style="margin-bottom:14px;">
+      Code incorrect — vérifiez avec le client.
+    </div>
+    <button class="btn btn-primary" id="confirm-submit-btn" onclick="submitConfirmCode()" disabled style="width:100%;">
+      ✓ Valider la remise
+    </button>
+  </div>
+</div>
   <div class="modal">
     <button class="modal-close" onclick="closeProductModal()">×</button>
     <h2 id="product-modal-title">Ajouter un produit</h2>
@@ -460,17 +490,21 @@ async function loadExistingOrders(){
     .from('commandes').select('*')
     .eq('restaurant_id', currentUser.id)
     .in('statut', ['recue','en_preparation'])
-    .order('date_creation');
-  (data || []).forEach(displayNewTicket);
+    .order('time', { ascending: true });
+  (data || []).forEach(order => displayNewTicket(order, false));
 }
 
-function displayNewTicket(order){
+function displayNewTicket(order, playSound = true){
   if(document.getElementById(`t-${order.id}`)) return;
 
   const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
   const counts = items.reduce((acc, name) => { acc[name] = (acc[name]||0)+1; return acc; }, {});
   let bodyHtml = '';
   for(const [name, count] of Object.entries(counts)) bodyHtml += `<li>[${count}x] ${escapeHtml(name)}</li>`;
+
+  const ticketNum = order.code_retrait
+    ? order.code_retrait.toString().slice(-3)
+    : order.id.toString().replace(/\D/g,'').slice(-3) || '???';
 
   const emptyMsg = document.getElementById('empty-msg');
   if(emptyMsg) emptyMsg.remove();
@@ -481,22 +515,55 @@ function displayNewTicket(order){
   card.innerHTML = `
     <div>
       <div class="ticket-header">
-        <span class="ticket-number">#${order.id.toString().slice(-3)}</span>
+        <span class="ticket-number">#${ticketNum}</span>
         <span class="ticket-time">${order.time || ''}</span>
       </div>
       <div class="ticket-client">${escapeHtml(order.client_nom || 'Client')}</div>
       <ul class="ticket-items">${bodyHtml}</ul>
       <div class="ticket-total">${(order.total || 0).toFixed(2)} €</div>
     </div>
-    <button class="btn-done" onclick="completeOrder(${order.id})">Prêt !</button>
+    <button class="btn-done" onclick="openConfirmModal('${order.id}', '${order.code_retrait}')">🔑 Prêt — Saisir le code</button>
   `;
   document.getElementById('kitchen-grid').appendChild(card);
-  playAlertSound();
+  if(playSound) playAlertSound();
 }
 
-async function completeOrder(id){
-  await _supabase.from('commandes').update({ statut: 'terminee' }).eq('id', id);
-  const card = document.getElementById(`t-${id}`);
+let pendingOrderId = null;
+let pendingOrderCode = null;
+
+function openConfirmModal(orderId, codeRetrait){
+  pendingOrderId = orderId;
+  pendingOrderCode = String(codeRetrait);
+  document.getElementById('confirm-code-input').value = '';
+  document.getElementById('confirm-error').style.display = 'none';
+  document.getElementById('confirm-submit-btn').disabled = true;
+  document.getElementById('confirm-modal').classList.add('show');
+  setTimeout(() => document.getElementById('confirm-code-input').focus(), 100);
+}
+
+function closeConfirmModal(){
+  pendingOrderId = null;
+  pendingOrderCode = null;
+  document.getElementById('confirm-modal').classList.remove('show');
+}
+
+function checkConfirmCode(){
+  const val = document.getElementById('confirm-code-input').value;
+  document.getElementById('confirm-error').style.display = 'none';
+  document.getElementById('confirm-submit-btn').disabled = val.length < 6;
+}
+
+async function submitConfirmCode(){
+  const entered = document.getElementById('confirm-code-input').value.trim();
+  if(entered !== pendingOrderCode){
+    document.getElementById('confirm-error').style.display = 'block';
+    document.getElementById('confirm-code-input').value = '';
+    document.getElementById('confirm-submit-btn').disabled = true;
+    return;
+  }
+  // Code correct → commande remise
+  await _supabase.from('commandes').update({ statut: 'remise' }).eq('id', pendingOrderId);
+  const card = document.getElementById(`t-${pendingOrderId}`);
   if(card){
     card.style.transform = 'scale(0.8)';
     card.style.opacity = '0';
@@ -508,6 +575,7 @@ async function completeOrder(id){
       }
     }, 300);
   }
+  closeConfirmModal();
 }
 
 function playAlertSound(){
