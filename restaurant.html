@@ -101,6 +101,9 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
 
 /* ---------- PROFILE ---------- */
 .profile-form{max-width:560px;}
+.danger-zone{max-width:560px;margin-top:40px;border:1.5px solid rgba(239,68,68,.3);border-radius:14px;padding:22px 24px;}
+.danger-zone h3{font-size:14px;font-weight:700;color:#ef4444;margin-bottom:6px;}
+.danger-zone p{font-size:13px;color:#64748b;margin-bottom:16px;line-height:1.5;}
 
 /* ---------- MODALS ---------- */
 .modal-overlay{position:fixed;inset:0;background:rgba(5,8,14,.65);display:none;align-items:center;
@@ -219,6 +222,33 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
       <div class="auth-error" id="profile-error"></div>
       <button class="btn btn-primary" style="width:auto;padding:11px 22px;" onclick="saveProfile()">Enregistrer les modifications</button>
     </div>
+
+    <!-- ZONE DANGER -->
+    <div class="danger-zone">
+      <h3>⚠️ Zone dangereuse</h3>
+      <p>La suppression de votre compte est <strong>irréversible</strong>. Votre restaurant disparaîtra immédiatement de la carte clients et du panneau d'administration. Tous vos produits seront également supprimés.</p>
+      <button class="btn btn-danger" style="width:auto;padding:11px 22px;" onclick="openDeleteAccountModal()">Supprimer mon compte définitivement</button>
+    </div>
+  </div>
+</div>
+
+<!-- =================== DELETE ACCOUNT MODAL =================== -->
+<div class="modal-overlay" id="delete-account-modal">
+  <div class="modal" style="max-width:400px;text-align:center;">
+    <button class="modal-close" onclick="closeDeleteAccountModal()">×</button>
+    <div style="font-size:42px;margin-bottom:12px;">🗑️</div>
+    <h2 style="font-size:19px;margin-bottom:8px;">Supprimer mon compte</h2>
+    <p style="color:#64748b;font-size:13.5px;margin-bottom:20px;line-height:1.6;">
+      Cette action est <strong style="color:#ef4444;">irréversible</strong>. Tapez le nom de votre restaurant pour confirmer.
+    </p>
+    <div class="field">
+      <input type="text" id="delete-confirm-input" placeholder="Nom exact du restaurant"
+        oninput="checkDeleteConfirm()" style="text-align:center;">
+    </div>
+    <div class="auth-error" id="delete-account-error"></div>
+    <button class="btn btn-danger" id="delete-account-btn" onclick="deleteMyAccount()" disabled style="width:100%;">
+      Supprimer définitivement
+    </button>
   </div>
 </div>
 
@@ -621,6 +651,42 @@ async function saveProfile(){
   restaurantProfile = { ...restaurantProfile, nom, cuisine, ville, adresse, description, photo_url };
   document.getElementById('restaurant-name-title').textContent = nom;
   successBox.style.display = 'block';
+}
+
+// ---------- DELETE ACCOUNT ----------
+function openDeleteAccountModal(){
+  document.getElementById('delete-confirm-input').value = '';
+  document.getElementById('delete-account-error').style.display = 'none';
+  document.getElementById('delete-account-btn').disabled = true;
+  document.getElementById('delete-account-modal').classList.add('show');
+  setTimeout(() => document.getElementById('delete-confirm-input').focus(), 100);
+}
+
+function closeDeleteAccountModal(){
+  document.getElementById('delete-account-modal').classList.remove('show');
+}
+
+function checkDeleteConfirm(){
+  const val = document.getElementById('delete-confirm-input').value.trim();
+  const expected = (restaurantProfile?.nom || '').trim();
+  document.getElementById('delete-account-btn').disabled = (val !== expected);
+}
+
+async function deleteMyAccount(){
+  const errBox = document.getElementById('delete-account-error');
+  errBox.style.display = 'none';
+
+  // 1. Supprimer les produits
+  await _supabase.from('produits').delete().eq('restaurant_id', currentUser.id);
+
+  // 2. Supprimer la fiche restaurant (disparaît de la carte et de l'admin)
+  const { error: delErr } = await _supabase.from('restaurants').delete().eq('id', currentUser.id);
+  if(delErr){ errBox.textContent = delErr.message; errBox.style.display = 'block'; return; }
+
+  // 3. Déconnexion et redirection
+  if(channel) _supabase.removeChannel(channel);
+  await _supabase.auth.signOut();
+  window.location.href = 'client.html';
 }
 
 function escapeHtml(str){
