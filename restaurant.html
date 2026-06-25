@@ -262,6 +262,23 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
 
 <!-- =================== PRODUCT MODAL =================== -->
 <div class="modal-overlay" id="product-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeProductModal()">×</button>
+    <h2 id="product-modal-title">Ajouter un produit</h2>
+    <input type="hidden" id="product-id">
+    <div class="field"><label>Nom du produit</label><input type="text" id="product-nom" placeholder="Smash Burger Max"></div>
+    <div class="row2">
+      <div class="field"><label>Prix (€)</label><input type="number" step="0.01" id="product-prix" placeholder="15.90"></div>
+      <div class="field"><label>Catégorie</label>
+        <select id="product-categorie"><option>Entrées</option><option>Plats</option><option>Desserts</option><option>Boissons</option></select>
+      </div>
+    </div>
+    <div class="field"><label>Description (optionnel)</label><input type="text" id="product-description"></div>
+    <div class="field"><label>Photo (URL image)</label><input type="text" id="product-photo" placeholder="https://..."></div>
+    <div class="auth-error" id="product-error"></div>
+    <button class="btn btn-primary" onclick="saveProduct()">Enregistrer le produit</button>
+  </div>
+</div>
 
 <!-- =================== CODE CONFIRM MODAL =================== -->
 <div class="modal-overlay" id="confirm-modal">
@@ -282,23 +299,6 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
     <button class="btn btn-primary" id="confirm-submit-btn" onclick="submitConfirmCode()" disabled style="width:100%;">
       ✓ Valider la remise
     </button>
-  </div>
-</div>
-  <div class="modal">
-    <button class="modal-close" onclick="closeProductModal()">×</button>
-    <h2 id="product-modal-title">Ajouter un produit</h2>
-    <input type="hidden" id="product-id">
-    <div class="field"><label>Nom du produit</label><input type="text" id="product-nom" placeholder="Smash Burger Max"></div>
-    <div class="row2">
-      <div class="field"><label>Prix (€)</label><input type="number" step="0.01" id="product-prix" placeholder="15.90"></div>
-      <div class="field"><label>Catégorie</label>
-        <select id="product-categorie"><option>Entrées</option><option>Plats</option><option>Desserts</option><option>Boissons</option></select>
-      </div>
-    </div>
-    <div class="field"><label>Description (optionnel)</label><input type="text" id="product-description"></div>
-    <div class="field"><label>Photo (URL image)</label><input type="text" id="product-photo" placeholder="https://..."></div>
-    <div class="auth-error" id="product-error"></div>
-    <button class="btn btn-primary" onclick="saveProduct()">Enregistrer le produit</button>
   </div>
 </div>
 
