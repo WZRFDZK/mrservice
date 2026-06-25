@@ -210,7 +210,7 @@ header{
 <header>
   <div class="logo"><div class="mark">🍴</div>Mr.<span>Service</span></div>
   <div class="search-wrap">
-    <input type="text" id="search-input" autocomplete="off" name="recherche-restaurant" placeholder="Rechercher un restaurant, une cuisine, une adresse...">
+    <input type="search" id="search-input" autocomplete="new-password" name="search-field" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" placeholder="Rechercher un restaurant, une cuisine, une adresse...">
   </div>
   <button class="btn btn-ghost tickets-btn" id="tickets-btn" style="display:none;" onclick="openTicketsModal()">🧾 Mes tickets</button>
   <div class="header-actions" id="header-actions">
@@ -299,6 +299,12 @@ let userPosition = null; // {lat, lon} — reste UNIQUEMENT dans le navigateur, 
 
 // ---------- INIT ----------
 async function init(){
+  // Nom de champ aleatoire a chaque chargement : empeche le navigateur de faire
+  // correspondre ce champ a une valeur memorisee precedemment (email, etc.)
+  const searchInput = document.getElementById('search-input');
+  searchInput.name = 'q_' + Math.random().toString(36).slice(2);
+  searchInput.value = '';
+
   initMap();
   await checkSession();
   await loadRestaurants();
