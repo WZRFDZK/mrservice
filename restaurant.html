@@ -101,6 +101,13 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
 
 /* ---------- PROFILE ---------- */
 .profile-form{max-width:560px;}
+.logo-field-row{display:flex;align-items:center;gap:12px;}
+.logo-preview{
+  width:48px;height:48px;border-radius:50%;background:#1e293b;border:1.5px solid #334155;
+  background-size:cover;background-position:center;flex-shrink:0;display:flex;align-items:center;
+  justify-content:center;font-size:18px;color:#475569;
+}
+.logo-field-row input{flex:1;}
 
 /* ---------- MODALS ---------- */
 .modal-overlay{position:fixed;inset:0;background:rgba(5,8,14,.65);display:none;align-items:center;
@@ -200,6 +207,14 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
   <div class="tab-content" id="tab-profil">
     <div class="profile-form">
       <div class="field"><label>Nom du restaurant</label><input type="text" id="profile-nom"></div>
+      <div class="field">
+        <label>Logo / enseigne (URL image)</label>
+        <div class="logo-field-row">
+          <div class="logo-preview" id="logo-preview"></div>
+          <input type="text" id="profile-logo" placeholder="https://...">
+        </div>
+        <p style="font-size:11.5px;color:#64748b;margin-top:5px;">Ce petit logo apparaît juste avant le nom de votre restaurant, visible par les clients et l'administration.</p>
+      </div>
       <div class="row2">
         <div class="field"><label>Type de cuisine</label>
           <select id="profile-cuisine">
@@ -214,7 +229,7 @@ body{background:#090d16;color:#f8fafc;font-family:'Poppins',sans-serif;}
         <p style="font-size:11.5px;color:#64748b;margin-top:5px;">En changeant l'adresse, votre position sur la carte sera automatiquement recalculée.</p>
       </div>
       <div class="field"><label>Description</label><textarea id="profile-description" rows="3"></textarea></div>
-      <div class="field"><label>Photo / logo (URL image)</label><input type="text" id="profile-photo" placeholder="https://..."></div>
+      <div class="field"><label>Photo principale (URL image)</label><input type="text" id="profile-photo" placeholder="https://..."></div>
       <div class="auth-success" id="profile-success">Profil mis à jour !</div>
       <div class="auth-error" id="profile-error"></div>
       <button class="btn btn-primary" style="width:auto;padding:11px 22px;" onclick="saveProfile()">Enregistrer les modifications</button>
@@ -450,7 +465,7 @@ async function loadExistingOrders(){
     .eq('restaurant_id', currentUser.id)
     .in('statut', ['recue','en_preparation'])
     .order('date_creation');
-  (data || []).forEach(displayNewTicket);
+  (data || []).forEach(order => displayNewTicket(order, false));
 }
 
 function displayNewTicket(order, playSound = true){
@@ -520,8 +535,8 @@ async function submitConfirmCode(){
     document.getElementById('confirm-submit-btn').disabled = true;
     return;
   }
-  // Code correct → marquer terminée
-  await _supabase.from('commandes').update({ statut: 'terminee' }).eq('id', pendingOrderId);
+  // Code correct → marquer la commande comme remise au client
+  await _supabase.from('commandes').update({ statut: 'remise' }).eq('id', pendingOrderId);
   const card = document.getElementById(`t-${pendingOrderId}`);
   if(card){
     card.style.transform = 'scale(0.8)';
@@ -647,7 +662,24 @@ function fillProfileForm(){
   document.getElementById('profile-adresse').value = restaurantProfile.adresse || '';
   document.getElementById('profile-description').value = restaurantProfile.description || '';
   document.getElementById('profile-photo').value = restaurantProfile.photo_url || '';
+  document.getElementById('profile-logo').value = restaurantProfile.logo_url || '';
+  updateLogoPreview(restaurantProfile.logo_url || '');
 }
+
+function updateLogoPreview(url){
+  const preview = document.getElementById('logo-preview');
+  if(url){
+    preview.style.backgroundImage = `url('${url}')`;
+    preview.textContent = '';
+  } else {
+    preview.style.backgroundImage = '';
+    preview.textContent = '🍴';
+  }
+}
+
+document.getElementById('profile-logo').addEventListener('input', (e) => {
+  updateLogoPreview(e.target.value.trim());
+});
 
 async function saveProfile(){
   const nom = document.getElementById('profile-nom').value.trim();
@@ -656,6 +688,7 @@ async function saveProfile(){
   const adresse = document.getElementById('profile-adresse').value.trim();
   const description = document.getElementById('profile-description').value.trim();
   const photo_url = document.getElementById('profile-photo').value.trim();
+  const logo_url = document.getElementById('profile-logo').value.trim();
   const successBox = document.getElementById('profile-success');
   const errBox = document.getElementById('profile-error');
   successBox.style.display = 'none';
@@ -668,14 +701,14 @@ async function saveProfile(){
   }
 
   const { error } = await _supabase.from('restaurants').update({
-    nom, cuisine, ville, adresse, description, photo_url,
+    nom, cuisine, ville, adresse, description, photo_url, logo_url,
     latitude: coords.lat, longitude: coords.lon,
     derniere_maj: new Date().toISOString()
   }).eq('id', currentUser.id);
 
   if(error){ errBox.textContent = error.message; errBox.style.display = 'block'; return; }
 
-  restaurantProfile = { ...restaurantProfile, nom, cuisine, ville, adresse, description, photo_url };
+  restaurantProfile = { ...restaurantProfile, nom, cuisine, ville, adresse, description, photo_url, logo_url };
   document.getElementById('restaurant-name-title').textContent = nom;
   successBox.style.display = 'block';
 }
