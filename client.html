@@ -148,7 +148,7 @@ header{
 .modal-success{background:#dcfce7;color:#15803d;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;display:none;}
 .modal-foot{text-align:center;margin-top:16px;font-size:13px;color:var(--muted);}
 .modal-foot a{color:var(--orange);font-weight:600;cursor:pointer;text-decoration:none;}
-.modal-close{position:absolute;top:18px;right:18px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);z-index:10;}
+.modal-close{position:absolute;top:18px;right:18px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);}
 .modal{position:relative;}
 .full-btn{width:100%;padding:13px;margin-top:6px;}
 
@@ -165,7 +165,7 @@ header{
 .qty-controls button{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line);
   background:#fff;font-size:15px;cursor:pointer;font-weight:700;color:var(--orange);}
 .qty-controls span{font-size:14px;font-weight:700;min-width:16px;text-align:center;}
-.cart-footer{position:sticky;bottom:0;background:#fff;margin:20px -32px -32px;padding:18px 32px;
+.cart-footer{position:sticky;bottom:-32px;background:#fff;margin:20px -32px -32px;padding:18px 32px;
   border-top:1px solid var(--line);}
 .cart-total{display:flex;justify-content:space-between;font-size:15px;font-weight:700;margin-bottom:12px;}
 
@@ -181,29 +181,28 @@ header{
 .pickup-code-value{font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:700;color:var(--orange-dark);letter-spacing:4px;margin:4px 0;}
 .pickup-code-hint{font-size:12.5px;color:var(--muted);}
 
-/* ---------- TICKET DE CAISSE ---------- */
-.ticket-btn{
-  display:flex;align-items:center;gap:7px;background:var(--cream);border:1.5px solid var(--line);
-  border-radius:9px;padding:9px 14px;font-size:13.5px;font-weight:600;cursor:pointer;
-  font-family:'Inter',sans-serif;color:var(--ink);transition:.15s;position:relative;
-}
-.ticket-btn:hover{border-color:var(--orange);color:var(--orange);}
-.ticket-badge{
-  background:var(--orange);color:#fff;border-radius:50%;width:18px;height:18px;
-  font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;
-  position:absolute;top:-6px;right:-6px;
-}
+.tickets-btn{white-space:nowrap;}
+
 .ticket-card{
-  background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px;
+  border:1.5px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;
 }
 .ticket-card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
-.ticket-card-head h3{font-size:14px;font-weight:700;font-family:'Inter',sans-serif;}
-.ticket-card-head .ticket-date{font-size:11.5px;color:var(--muted);}
-.ticket-items{font-size:13px;color:var(--ink);line-height:1.7;margin-bottom:8px;}
-.ticket-footer{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:8px;margin-top:4px;}
-.ticket-total{font-size:14px;font-weight:700;}
-.ticket-code{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--orange-dark);
-  background:var(--cream);border:1.5px dashed var(--orange);border-radius:7px;padding:4px 10px;}
+.ticket-card-head h4{font-size:14.5px;font-family:'Inter',sans-serif;font-weight:700;}
+.ticket-card-head .tc-date{font-size:11.5px;color:var(--muted);margin-top:2px;}
+.tc-status{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:50px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;}
+.tc-status.recue{background:#fef3c7;color:#b45309;}
+.tc-status.en_preparation{background:#dbeafe;color:#1d4ed8;}
+.tc-status.remise{background:#dcfce7;color:#15803d;}
+.tc-status.annulee{background:#fee2e2;color:#b91c1c;}
+.tc-items{list-style:none;font-size:13px;color:#4a4036;margin:10px 0;padding:10px 0;
+  border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);}
+.tc-foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
+.tc-total{font-weight:700;font-size:14px;}
+.tc-code{
+  font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--orange-dark);
+  background:var(--cream);padding:4px 10px;border-radius:7px;letter-spacing:2px;
+}
+.tc-code.used{color:var(--muted);text-decoration:line-through;background:transparent;}
 </style>
 </head>
 <body>
@@ -213,6 +212,7 @@ header{
   <div class="search-wrap">
     <input type="text" id="search-input" autocomplete="off" name="recherche-restaurant" placeholder="Rechercher un restaurant, une cuisine, une adresse...">
   </div>
+  <button class="btn btn-ghost tickets-btn" id="tickets-btn" style="display:none;" onclick="openTicketsModal()">🧾 Mes tickets</button>
   <div class="header-actions" id="header-actions">
     <button class="btn btn-ghost" onclick="openModal('login-modal')">Se connecter</button>
     <button class="btn btn-primary" onclick="openModal('signup-modal')">S'inscrire</button>
@@ -274,15 +274,13 @@ header{
   </div>
 </div>
 
-<!-- ===================== TICKET DE CAISSE MODAL ===================== -->
-<div class="modal-overlay" id="ticket-modal">
-  <div class="modal" style="max-width:500px;">
-    <button class="modal-close" onclick="closeModal('ticket-modal')">×</button>
-    <h2>🧾 Ticket de caisse</h2>
-    <p class="sub">Historique de toutes vos commandes</p>
-    <div id="ticket-modal-content">
-      <div class="empty">Chargement...</div>
-    </div>
+<!-- ===================== MES TICKETS MODAL ===================== -->
+<div class="modal-overlay" id="tickets-modal">
+  <div class="modal" style="max-width:480px;">
+    <button class="modal-close" onclick="closeModal('tickets-modal')">×</button>
+    <h2>Mes tickets de caisse</h2>
+    <p class="sub">Historique de vos commandes et codes de retrait</p>
+    <div id="tickets-list"></div>
   </div>
 </div>
 
@@ -327,14 +325,10 @@ async function checkSession(){
 function renderHeaderLoggedIn(nom){
   const initials = nom.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('header-actions').innerHTML = `
-    <button class="ticket-btn" onclick="openTicketDeCaisse()" id="ticket-btn">
-      🧾 Ticket de caisse
-      <span class="ticket-badge" id="ticket-count" style="display:none;">0</span>
-    </button>
     <div class="user-chip"><div class="av">${initials}</div>${nom}</div>
     <button class="btn btn-ghost" onclick="logout()">Déconnexion</button>
   `;
-  refreshTicketCount();
+  document.getElementById('tickets-btn').style.display = 'inline-flex';
 }
 
 async function logout(){
@@ -653,66 +647,6 @@ function updateCartTotal(){
   document.getElementById('send-order-btn').disabled = count === 0;
 }
 
-// ---------- TICKET DE CAISSE ----------
-function getOrderHistory(){
-  try {
-    const key = currentUser ? `mrservice_orders_${currentUser.id}` : 'mrservice_orders';
-    const raw = sessionStorage.getItem(key);
-    return raw ? JSON.parse(raw) : [];
-  } catch(e){ return []; }
-}
-
-function saveOrderToHistory(order){
-  try {
-    const key = currentUser ? `mrservice_orders_${currentUser.id}` : 'mrservice_orders';
-    const history = getOrderHistory();
-    history.unshift(order); // plus récent en premier
-    sessionStorage.setItem(key, JSON.stringify(history));
-  } catch(e){ console.error('Erreur sauvegarde ticket:', e); }
-}
-
-function refreshTicketCount(){
-  const badge = document.getElementById('ticket-count');
-  if(!badge) return;
-  const count = getOrderHistory().length;
-  if(count > 0){
-    badge.textContent = count;
-    badge.style.display = 'flex';
-  } else {
-    badge.style.display = 'none';
-  }
-}
-
-async function openTicketDeCaisse(){
-  openModal('ticket-modal');
-  const history = getOrderHistory();
-  const content = document.getElementById('ticket-modal-content');
-
-  if(history.length === 0){
-    content.innerHTML = `<div class="empty" style="padding:40px 10px;">
-      <div style="font-size:36px;margin-bottom:10px;">🧾</div>
-      <p>Aucune commande passée lors de cette session.</p>
-    </div>`;
-    return;
-  }
-
-  content.innerHTML = history.map((o, i) => `
-    <div class="ticket-card">
-      <div class="ticket-card-head">
-        <h3>${escapeHtml(o.restaurantNom)}</h3>
-        <span class="ticket-date">🕐 ${escapeHtml(o.date)} — ${escapeHtml(o.time)}</span>
-      </div>
-      <div class="ticket-items">
-        ${o.items.map(it => `• ${escapeHtml(it)}`).join('<br>')}
-      </div>
-      <div class="ticket-footer">
-        <span class="ticket-total">Total : ${parseFloat(o.total).toFixed(2)} €</span>
-        <span class="ticket-code">Code : ${escapeHtml(o.codeRetrait)}</span>
-      </div>
-    </div>
-  `).join('');
-}
-
 async function sendOrder(){
   if(!currentUser){
     closeModal('order-modal');
@@ -753,18 +687,6 @@ async function sendOrder(){
     return;
   }
 
-  // Sauvegarde dans l'historique local (ticket de caisse)
-  const now = new Date();
-  saveOrderToHistory({
-    restaurantNom: activeRestaurant.nom,
-    date: now.toLocaleDateString('fr-FR'),
-    time: timeString,
-    items: items,
-    total: total,
-    codeRetrait: codeRetrait
-  });
-  refreshTicketCount();
-
   document.getElementById('order-modal-content').innerHTML = `
     <div class="gate-msg">
       <div class="icon">✅</div>
@@ -778,6 +700,66 @@ async function sendOrder(){
       <button class="btn btn-primary full-btn" style="margin-top:18px;" onclick="closeModal('order-modal')">Fermer</button>
     </div>
   `;
+}
+
+// ---------- MES TICKETS DE CAISSE ----------
+async function openTicketsModal(){
+  if(!currentUser) return;
+  openModal('tickets-modal');
+
+  const listEl = document.getElementById('tickets-list');
+  listEl.innerHTML = `<div class="empty">Chargement de vos tickets...</div>`;
+
+  const { data, error } = await _supabase
+    .from('commandes')
+    .select('*, restaurants(nom)')
+    .eq('client_id', currentUser.id)
+    .order('date_creation', { ascending: false });
+
+  if(error){
+    listEl.innerHTML = `<div class="empty">Impossible de charger vos tickets pour le moment.</div>`;
+    console.error(error);
+    return;
+  }
+
+  renderTicketsList(data || []);
+}
+
+const statusLabelsClient = { recue: 'Reçue', en_preparation: 'En préparation', remise: 'Récupérée', annulee: 'Annulée' };
+
+function renderTicketsList(orders){
+  const listEl = document.getElementById('tickets-list');
+
+  if(orders.length === 0){
+    listEl.innerHTML = `<div class="empty">Vous n'avez pas encore passé de commande.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = orders.map(o => {
+    const items = typeof o.items === 'string' ? JSON.parse(o.items) : o.items;
+    const counts = items.reduce((acc, name) => { acc[name] = (acc[name]||0)+1; return acc; }, {});
+    const itemsHtml = Object.entries(counts).map(([name, count]) => `<li>${count}x ${escapeHtml(name)}</li>`).join('');
+    const restaurantNom = o.restaurants ? o.restaurants.nom : 'Restaurant';
+    const dateStr = new Date(o.date_creation).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
+    const isUsed = o.statut === 'remise';
+
+    return `
+      <div class="ticket-card">
+        <div class="ticket-card-head">
+          <div>
+            <h4>${escapeHtml(restaurantNom)}</h4>
+            <div class="tc-date">${dateStr} à ${o.time || ''}</div>
+          </div>
+          <span class="tc-status ${o.statut}">${statusLabelsClient[o.statut] || o.statut}</span>
+        </div>
+        <ul class="tc-items">${itemsHtml}</ul>
+        <div class="tc-foot">
+          <span class="tc-total">${(o.total || 0).toFixed(2)} €</span>
+          ${o.code_retrait ? `<span class="tc-code ${isUsed ? 'used' : ''}">${o.code_retrait}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function escapeHtml(str){
